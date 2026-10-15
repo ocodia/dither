@@ -10,7 +10,17 @@ Serve this directory with any static HTTP server. With Node.js installed:
 npm start
 ```
 
-Open http://127.0.0.1:4173. No install or build step is needed. ES modules, IndexedDB and the service worker require an HTTP origin; opening `index.html` as a `file:` URL is not supported. Installation/offline support requires HTTPS or localhost.
+Open http://127.0.0.1:4173.
+
+Alternatively, with Python 3 installed, run this from the repository directory:
+
+```sh
+python3 -m http.server 8000;
+```
+
+Then open http://localhost:8000.
+
+No install or build step is needed. ES modules, IndexedDB and the service worker require an HTTP origin; opening `index.html` as a `file:` URL is not supported. Installation/offline support requires HTTPS or localhost.
 
 To deploy on GitHub Pages, publish the directory as static files. All app, icon, manifest, worker and module URLs are relative and support a repository subdirectory. No deployment has been performed by this implementation.
 
