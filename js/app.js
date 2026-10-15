@@ -284,7 +284,7 @@ const actions = {
   text: (atPointer = false) => addLayer('text', atPointer), rectangle: (atPointer = false) => addLayer('rectangle', atPointer), ellipse: (atPointer = false) => addLayer('ellipse', atPointer), line: (atPointer = false) => addLayer('line', atPointer), arrow: (atPointer = false) => addLayer('arrow', atPointer),
   duplicate: () => { const source = selected(); if (!source || source.locked) return; const layer = clone(source); layer.id = uid(); layer.name += ' copy'; layer.transform.x += 20; layer.transform.y += 20; layer.effects.forEach(e => { e.id = uid(); }); selectedId = layer.id; history.execute(insertCommand(doc, layer, doc.layers.indexOf(source) + 1)); },
   delete: () => { const layer = selected(); if (layer && !layer.locked) history.execute(deleteCommand(doc, layer)); },
-  raise: () => reorder(1), lower: () => reorder(-1),
+  raise: () => reorder(1), lower: () => reorder(-1), 'bring-to-top': () => reorder(doc.layers.length),
   'flip-x': () => flip('flipX'), 'flip-y': () => flip('flipY'), rasterise,
   'zoom-in': () => workspace.zoomAt(1.2), 'zoom-out': () => workspace.zoomAt(1 / 1.2), 'zoom-reset': () => workspace.zoomAt(1 / workspace.view.zoom), fit: () => workspace.fit(),
   canvas: () => { selectedId = null; collapsedProperties.delete('canvas'); setTab('properties'); refresh(); $('#inspector').classList.add('mobile-open'); },
@@ -341,7 +341,8 @@ function openContextMenu(e, inPanel, keyboard = false) {
     items.push(item('Copy layer', copyLayer), item('Duplicate layer', actions.duplicate, locked));
     items.push(item('Paste layer', pasteLayer, !layerClipboard || layerPasting), null);
     if (['shape', 'text'].includes(layer.type)) items.push(item('Rasterise', rasterise, locked || rasterising));
-    items.push(item('Bring forward', actions.raise, locked || index === doc.layers.length - 1), item('Send backward', actions.lower, locked || index === 0), null);
+    items.push(item('Bring to top', actions['bring-to-top'], locked || index === doc.layers.length - 1),
+      item('Bring forward', actions.raise, locked || index === doc.layers.length - 1), item('Send backward', actions.lower, locked || index === 0), null);
     items.push(item(layer.visible ? 'Hide layer' : 'Show layer', () => commandPatch(layer, { visible: !layer.visible }, 'Layer visibility')),
       item(locked ? 'Unlock layer' : 'Lock layer', () => commandPatch(layer, { locked: !layer.locked }, 'Lock layer')), null,
       item('Delete layer', actions.delete, locked, true));

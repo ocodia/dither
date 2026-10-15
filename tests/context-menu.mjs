@@ -16,6 +16,17 @@ try {
   await page.locator('#new-dialog [data-close]').click();
   await page.locator('[data-action=rectangle]').click();
   await page.locator('[data-action=text]').click();
+  await row('Text').click({ button: 'right' });
+  assert.ok(await option('Bring to top').isDisabled());
+  await page.keyboard.press('Escape');
+  const order=()=>page.locator('.layer-name').allTextContents();
+  const before=await order();
+  await row('Rectangle').click({ button: 'right' });
+  await option('Bring to top').click();
+  assert.deepEqual(await order(),['Rectangle','Text']);
+  await key('Control+z');assert.deepEqual(await order(),before);
+  await key('Control+Shift+z');assert.deepEqual(await order(),['Rectangle','Text']);
+  await key('Control+z');
   await row('Rectangle').click({ button: 'right' });
   assert.ok(await row('Rectangle').evaluate(el => el.classList.contains('selected')));
   assert.ok(await option('Paste layer').isDisabled());
@@ -30,7 +41,7 @@ try {
   await row('Rectangle').click({ button: 'right' }); assert.equal(await option('Rasterise').count(), 0);
   await option('Lock layer').click();
   await row('Rectangle').click({ button: 'right' });
-  for (const name of ['Duplicate layer', 'Delete layer', 'Bring forward', 'Send backward']) assert.ok(await option(name).isDisabled());
+  for (const name of ['Duplicate layer', 'Delete layer', 'Bring to top', 'Bring forward', 'Send backward']) assert.ok(await option(name).isDisabled());
   assert.ok(await option('Copy layer').isEnabled());
   await option('Unlock layer').click();
   await row('Text').click({ button: 'right' }); await option('Hide layer').click();
@@ -46,9 +57,11 @@ try {
   const bounds = await page.locator('#stage').boundingBox();
   await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, { button: 'right' });
   assert.ok(await option('Duplicate layer').isVisible());
+  assert.ok(await option('Bring to top').isVisible());
   await option('Duplicate layer').click(); assert.equal(await page.locator('#layer-count').textContent(), '5');
   await page.locator('#workspace').click({ button: 'right', position: { x: 8, y: 8 } });
   assert.ok(await option('Fit canvas').isVisible());
+  assert.equal(await option('Bring to top').count(),0);
   await page.locator('[data-action=text]').click(); assert.ok(await menu.isHidden());
   // Clamp the menu at the bottom-right of the viewport.
   await row('Text').first().dispatchEvent('contextmenu', { clientX: 1278, clientY: 898 });
@@ -64,7 +77,8 @@ try {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await key('Control+c');
   await page.waitForFunction(async () => (await navigator.clipboard.readText()).startsWith('Dither layer '));
-  await key('Control+v');
+  await key(process.platform === 'darwin' ? 'Meta+v' : 'Control+v');
+  await page.waitForFunction(() => document.querySelector('#layer-count').textContent === '2');
   assert.equal(await page.locator('#layer-count').textContent(), '2');
   await row('Rectangle copy copy').click({ button: 'right' });
   if (process.env.DITHER_SCREENSHOT) await page.screenshot({ path: process.env.DITHER_SCREENSHOT });
