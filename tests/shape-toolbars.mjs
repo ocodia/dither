@@ -29,7 +29,8 @@ try{
     assert.equal(await toolbar.locator('[data-path^="shape."]').count(),size);
     assert.equal(await page.locator('#properties [data-path^="shape."]').count(),0);
     assert.ok(await page.locator('#properties [data-path="transform.width"]').isVisible());
-    assert.ok(await page.locator('#properties [data-action=rasterise]').isVisible());
+    assert.equal(await page.locator('#properties [data-action=rasterise]').count(),0);
+    assert.ok(await toolbar.locator('[data-action=rasterise]').isVisible());
     for(const slider of await toolbar.locator('input[data-path$="Opacity"]').all()){
       assert.equal(await slider.getAttribute('min'),'0');assert.equal(await slider.getAttribute('max'),'1');assert.equal(await slider.getAttribute('step'),'0.05');
     }

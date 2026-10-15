@@ -1,4 +1,4 @@
-import { icon, typographyHTML, hasShapeToolbar, shapeOptionsHTML } from '../components/panels.js';
+import { icon, typographyHTML, hasShapeToolbar, shapeOptionsHTML, layerActionsHTML } from '../components/panels.js';
 import { clone, createLayer, checkSize } from '../model/document.js';
 import { isSelectionTool } from '../model/pixel-region.js';
 import { canGradient, isPath, pathBounds, tracePath, validGradient, editableStops, addGradientStop, gradientOffset } from '../model/vector.js';
@@ -89,13 +89,17 @@ export class ToolController {
     const tool=this.workspace.tool,s=this.settings,l=this.getLayer();
     if(tool==='move'&&hasShapeToolbar(l)){
       this.controls.hidden=false;this.controls.setAttribute('aria-label',`${l.shape.kind[0].toUpperCase()+l.shape.kind.slice(1)} options`);
-      this.controlsLayer=l;this.controls.innerHTML=shapeOptionsHTML(l);return;
+      this.controlsLayer=l;this.controls.innerHTML=shapeOptionsHTML(l)+layerActionsHTML(l,this.isRasterising?.());return;
     }
     if(tool==='move'&&l?.type==='text'){
       this.controls.hidden=false;this.controls.setAttribute('aria-label','Typography options');
-      this.controlsLayer=l;this.controls.innerHTML=typographyHTML(l,!!this.workspace.textEditor?.layer);return;
+      this.controlsLayer=l;this.controls.innerHTML=typographyHTML(l,!!this.workspace.textEditor?.layer)+layerActionsHTML(l,this.isRasterising?.());return;
     }
-    this.controls.hidden=!this.active();if(!this.active())return;
+    if(tool==='move'&&l?.type==='shape'){
+      this.controls.hidden=false;this.controls.setAttribute('aria-label','Path options');
+      this.controlsLayer=l;this.controls.innerHTML=icon('pen')+layerActionsHTML(l,this.isRasterising?.());return;
+    }
+    this.controls.hidden=!this.active();if(!this.active()){this.controls.replaceChildren();this.controlsLayer=l;return;}
     this.controls.setAttribute('aria-label',`${names[tool]} tool options`);
     let html=icon(toolIcons[tool]);
     if(tool==='pen'){
@@ -103,8 +107,16 @@ export class ToolController {
       const disabled=target&&(target.locked||!target.visible);
       html+=`<fieldset class="pen-style-options" aria-label="Fill" ${disabled?'disabled':''}><label>Fill<input aria-label="Path fill colour" data-pen-style="fill" type="color" value="${style.fill}"></label>${slider('Opacity','fillOpacity',style.fillOpacity,0,1,.05,'pen-style','Fill opacity')}</fieldset><fieldset class="pen-style-options pen-stroke-options" aria-label="Stroke" ${disabled?'disabled':''}><label>Stroke<input aria-label="Path stroke colour" data-pen-style="stroke" type="color" value="${style.stroke}"></label>${slider('Width','strokeWidth',style.strokeWidth,0,100,1,'pen-style','Stroke width')}${slider('Opacity','strokeOpacity',style.strokeOpacity,0,1,.05,'pen-style','Stroke opacity')}</fieldset>`;
     }else if(tool==='brush')html+=`<label>Colour<input aria-label="Brush colour" data-setting="foreground" type="color" value="${s.foreground}"></label>`;
+    else if(tool==='fill')html+=`<label>Fill<input aria-label="Fill colour" data-setting="foreground" type="color" value="${s.foreground}"></label>`;
+    else if(tool==='eyedropper'){
+      html+=`<label>Colour<input aria-label="Colour" data-setting="foreground" type="color" value="${s.foreground}"></label>`;
+      for(const format of ['hex','rgb']){
+        const label=format.toUpperCase(),value=format==='hex'?s.foreground:`rgb(${hexRGB(s.foreground).join(', ')})`;
+        html+=`<div class="colour-copy"><label>${label}<input type="text" aria-label="${label} colour" data-colour-format="${format}" value="${value}" readonly spellcheck="false"></label><button type="button" data-tool-action="copy-${format}" aria-label="Copy ${label}" title="Copy ${label}">${icon('copy')}</button></div>`;
+      }
+    }
     else if(!['gradient','eraser'].includes(tool))html+=`<label>Foreground<input aria-label="Foreground colour" data-setting="foreground" type="color" value="${s.foreground}"></label><label>Background<input aria-label="Background colour" data-setting="background" type="color" value="${s.background}"></label>`;
-    if(['eraser','fill','eyedropper'].includes(tool))html+=slider('Opacity','opacity',s.opacity,0,1,.05);
+    if(tool==='eraser')html+=slider('Opacity','opacity',s.opacity,0,1,.05);
     if(['brush','eraser'].includes(tool))html+=field('Size (px)','size',s.size,1,1024)+slider('Hardness','hardness',s.hardness,0,1,.01);
     if(tool==='fill')html+=slider('Tolerance','tolerance',s.tolerance,0,255);
     if(tool==='pen'){
@@ -117,6 +129,7 @@ export class ToolController {
       if(actions)html+=`<div class="pen-path-actions" role="group" aria-label="Path actions">${actions}</div>`;
     }
     if(tool==='gradient')html+=this.gradientControls();
+    if(['pen','gradient'].includes(tool))html+=layerActionsHTML(l,this.isRasterising?.(),tool);
     this.controlsLayer=l;this.controls.innerHTML=html;
   }
   gradientState(){
@@ -210,11 +223,13 @@ export class ToolController {
     if(e.target.dataset.penStyle){this.changePenStyle(e.target,true);return;}
     const el=e.target,key=el.dataset.setting,l=this.getLayer(),numeric=['number','range'].includes(el.type);
     if(key){let value=numeric?Number(el.value):el.value;if(numeric){if(el.value===''||!Number.isFinite(value))return;value=Math.max(Number(el.min),Math.min(Number(el.max),value));el.value=value;}this.settings[key]=value;
+      if(key==='foreground')for(const input of this.controls.querySelectorAll('[data-colour-format]'))input.value=input.dataset.colourFormat==='hex'?value:`rgb(${hexRGB(value).join(', ')})`;
       if(key==='gradientType'&&canGradient(l)&&l.shape.gradient&&!l.locked&&l.visible){const shape=clone(l.shape);shape.gradient.type=value;this.patch(l,{shape},'Change gradient type');}return;}
   }
 
   action(e){
     const button=e.target.closest('[data-tool-action]'),action=button?.dataset.toolAction;if(!action||button.disabled)return;
+    if(action==='copy-hex'||action==='copy-rgb'){this.copyColour(action==='copy-rgb');return;}
     if(this.gradientAction(action,button))return;
     const l=this.getLayer();
     if(action==='rasterise'){this.cancel();this.rasterise();return;}
@@ -282,7 +297,7 @@ export class ToolController {
         // marks to the layer. Flood fill still needs an actual source pixel.
         if(tool==='fill'&&(point.x<0||point.y<0||point.x>=base.width||point.y>=base.height))return;
         const mask=selectionMask(this.selection.current()?.points,base.width,base.height);
-        this.gesture={type:tool,layer:l,snapshot:clone(l),document:this.getDocument(),assets:this.getAssets(),base,mask,last:point,scale:brushScale(l.transform,base.width,base.height),settings:{...this.settings,opacity:tool==='brush'?1:this.settings.opacity}};
+        this.gesture={type:tool,layer:l,snapshot:clone(l),document:this.getDocument(),assets:this.getAssets(),base,mask,last:point,scale:brushScale(l.transform,base.width,base.height),settings:{...this.settings,opacity:['brush','fill'].includes(tool)?1:this.settings.opacity}};
         if(tool==='fill'){this.fill(point);return;}
         this.gesture.stroke=surface(base.width,base.height);stamp(this.gesture.stroke.getContext('2d'),point,this.settings.size,this.settings.hardness,this.settings.foreground,this.gesture.scale);this.capture(e);this.paintPreview();
       }catch(error){this.gesture=null;this.notify(error.message,true);}return;
@@ -376,6 +391,12 @@ export class ToolController {
     const doc=this.getDocument(),assets=this.getAssets(),token=++this.token;this.busy=true;let meta,inserted=false;
     try{const canvas=surface(doc.canvas.width,doc.canvas.height),blob=await pngBlob(canvas);if(token!==this.token||doc!==this.getDocument())return;meta=await assets.add(blob);if(token!==this.token||doc!==this.getDocument())return;meta.name='Paint.png';doc.assets.push(meta);const l=createLayer('image',doc.canvas,{name:'Paint',assetId:meta.id});Object.assign(l.transform,{width:doc.canvas.width,height:doc.canvas.height});this.insert(l);inserted=true;}
     catch(error){if(token===this.token)this.notify(error.message,true);}finally{if(meta&&!inserted)assets.remove(meta.id);if(token===this.token)this.busy=false;}
+  }
+  async copyColour(rgb=false){
+    const colour=this.settings.foreground;
+    const value=rgb?`rgb(${hexRGB(colour).join(', ')})`:colour;
+    try{await navigator.clipboard.writeText(value);this.notify(`Copied ${value}`);}
+    catch{this.notify('Could not copy colour to the clipboard.',true);}
   }
   async sample(p){
     const token=++this.token,doc=this.getDocument(),target=this.sampleTarget;this.sampleTarget=null;

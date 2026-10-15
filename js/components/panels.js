@@ -16,17 +16,6 @@ export function propertiesHTML(doc, layer, collapsed = new Set()) {
   const t = layer.transform;
   let html = section(`${field('Layer name', 'name', layer.name, 'text', 'maxlength="100"')}<div class="layer-property-actions">${check('Lock layer', 'locked', layer.locked)}</div>`);
   html += `<fieldset ${layer.locked ? 'disabled' : ''} style="border:0;padding:0;margin:0;min-width:0">`;
-  if (['shape', 'text'].includes(layer.type)) {
-    const action = (attribute, label, glyph) => `<button type="button" ${attribute}>${icon(glyph)}<span>${label}</span></button>`;
-    let actions = '';
-    if (layer.shape?.kind === 'path') actions += action('data-tool="pen"', 'Edit path anchors', 'pen') + action('data-tool-action="smooth"', 'Smooth anchor', 'bezier-curve') + action('data-tool-action="corner"', 'Corner anchor', 'square');
-    if (layer.shape?.kind === 'path' && layer.shape.closed) {
-      actions += action('data-tool="gradient"', 'Edit gradient fill', 'color-background');
-      if (layer.shape.gradient) actions += action('data-tool-action="solid"', 'Use solid fill', 'paint-bucket');
-    }
-    actions += action('class="rasterise-button" data-action="rasterise" title="Convert to an image, including current effects. Undo restores the editable layer."', 'Rasterise', 'image');
-    html += section(`<div class="property-action-buttons" role="group" aria-label="Layer actions">${actions}</div>`);
-  }
   if (layer.type === 'shape' && !hasShapeToolbar(layer)) {
     const s = layer.shape, isLine = ['line', 'arrow'].includes(s.kind);
     html += group("shape", s.kind, `<div class="field-grid">${isLine ? '' : field('Fill', 'shape.fill', s.fill, 'color') + num('Fill opacity', 'shape.fillOpacity', s.fillOpacity, 0, 1, 0.01)}${field('Stroke', 'shape.stroke', s.stroke, 'color')}${num('Stroke width', 'shape.strokeWidth', s.strokeWidth, 0, 100)}${num('Stroke opacity', 'shape.strokeOpacity', s.strokeOpacity, 0, 1, 0.01)}${s.kind === 'rectangle' ? num('Corner radius', 'shape.radius', s.radius, 0, 1000) : ''}${s.kind === 'arrow' ? num('Arrowhead size', 'shape.arrowSize', s.arrowSize, 1, 200) + check('Start arrowhead', 'shape.startArrow', s.startArrow) + check('End arrowhead', 'shape.endArrow', s.endArrow) : ''}</div>`);
@@ -76,7 +65,22 @@ export function shapeOptionsHTML(layer) {
     ${toolbarSlider('Stroke opacity', 'shape.strokeOpacity', s.strokeOpacity, 0, 1, .05)}
     ${s.kind === 'rectangle' ? toolbarSlider('Corner radius', 'shape.radius', s.radius, 0, 100, 10) : ''}
     ${s.kind === 'arrow' ? toolbarSlider('Arrowhead size', 'shape.arrowSize', s.arrowSize, 10, 500) + check('Start arrowhead', 'shape.startArrow', s.startArrow) + check('End arrowhead', 'shape.endArrow', s.endArrow) : ''}
-    ${filled ? '<button type="button" data-tool="gradient">Edit gradient fill</button>' : ''}
-    ${filled && s.gradient ? '<button type="button" data-tool-action="solid">Use solid fill</button>' : ''}
+    ${filled ? '<button type="button" data-tool="gradient">Gradient fill</button>' : ''}
+    ${filled && s.gradient ? '<button type="button" data-tool-action="solid">Solid fill</button>' : ''}
     </fieldset>`;
+}
+
+export function layerActionsHTML(layer, rasterising = false, tool = 'move') {
+  if (!layer || !['shape', 'text'].includes(layer.type)) return '';
+  const action = (attribute, label, glyph) => `<button type="button" ${attribute}>${icon(glyph)}<span>${label}</span></button>`;
+  let actions = '';
+  if (layer.shape?.kind === 'path') {
+    if (tool !== 'pen') actions += action('data-tool="pen"', 'Edit path', 'pen');
+    if (layer.shape.closed) {
+      if (tool !== 'gradient') actions += action('data-tool="gradient"', 'Gradient fill', 'color-background');
+      if (layer.shape.gradient) actions += action('data-tool-action="solid"', 'Solid fill', 'paint-bucket');
+    }
+  }
+  actions += action(`data-action="rasterise" ${rasterising ? 'disabled' : ''} title="Convert to an image, including current effects. Undo restores the editable layer."`, rasterising ? 'Rasterising…' : 'Rasterise', 'image');
+  return `<div class="layer-toolbar-actions" role="group" aria-label="Layer actions"><fieldset ${layer.locked || !layer.visible ? 'disabled' : ''}>${actions}</fieldset></div>`;
 }

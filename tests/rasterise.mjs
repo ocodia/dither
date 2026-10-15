@@ -43,6 +43,8 @@ try {
   console.log('PASS raster pixel appearance with fractional sizes, rotation, flips, opacity, strokes, arrowheads and effects', checks);
   for (const kind of ['rectangle', 'ellipse', 'line', 'arrow', 'text']) {
     await page.locator(`[data-action=${kind}]`).click();
+    assert.equal(await page.locator('#properties .property-action-buttons, #properties [data-action=rasterise]').count(),0);
+    assert.ok(await page.locator('#tool-options [data-action=rasterise]').isVisible());
     if (kind === 'text') {
       await page.locator('[data-path="text.fontFamily"]').selectOption('Inter');
       await editTextContent(page,'Editable after undo');
@@ -69,7 +71,7 @@ try {
   await page.locator('[data-action=rectangle]').click();
   await page.evaluate(async () => {
     const {DocumentRenderer}=await import('./js/rendering/renderer.js'); const original=DocumentRenderer.prototype.rasteriseLayer;
-    DocumentRenderer.prototype.rasteriseLayer=async function(...args) { await new Promise(resolve=>window.releaseRasterise=resolve); return original.apply(this,args); };
+    DocumentRenderer.prototype.rasteriseLayer=async function(...args) { DocumentRenderer.prototype.rasteriseLayer=original; await new Promise(resolve=>window.releaseRasterise=resolve); return original.apply(this,args); };
   });
   await page.locator('[data-action=rasterise]').click();
   const name=page.locator('[data-path=name]'); await name.fill('Changed while rasterising'); await name.press('Tab');
@@ -78,5 +80,30 @@ try {
   assert.ok(await page.locator('[data-action=rasterise]').isEnabled());
   assert.equal(await page.locator('.layer-row.selected .layer-thumb use[href="./icons/ui.svg#image"]').count(),0);
   console.log('PASS stale conversion cancellation');
+  await key('p');
+  const stage=await page.locator('#stage').boundingBox();
+  for(const [x,y] of [[.3,.4],[.65,.4],[.5,.65]]){await page.mouse.click(stage.x+stage.width*x,stage.y+stage.height*y);await ready();}
+  await key('Enter');
+  await page.locator('.layer-row.selected .layer-select').click();await ready();
+  const toolbar=page.locator('#tool-options');
+  assert.equal(await toolbar.getAttribute('aria-label'),'Path options');
+  assert.equal(await page.locator('#properties .property-action-buttons, #properties [data-tool=pen], #properties [data-tool=gradient]').count(),0);
+  assert.ok(await toolbar.getByRole('button',{name:'Edit path',exact:true}).isVisible());
+  assert.equal(await toolbar.getByRole('button',{name:'Gradient fill',exact:true}).count(),0);
+  await toolbar.getByRole('button',{name:'Edit path',exact:true}).click();
+  assert.equal(await toolbar.getByRole('button',{name:'Edit path',exact:true}).count(),0);
+  assert.equal(await page.locator('[data-anchor-handle=point]').count(),3);
+  await toolbar.locator('[data-tool-action=close-shape]').click();await key('v');
+  await toolbar.getByRole('button',{name:'Gradient fill',exact:true}).click();
+  assert.equal(await toolbar.getByRole('button',{name:'Gradient fill',exact:true}).count(),0);
+  await page.mouse.move(stage.x+stage.width*.35,stage.y+stage.height*.45);await page.mouse.down();await page.mouse.move(stage.x+stage.width*.6,stage.y+stage.height*.6,{steps:5});await page.mouse.up();await ready();
+  await key('v');await toolbar.getByRole('button',{name:'Solid fill',exact:true}).click();await ready();
+  await key('Control+z');assert.ok(await toolbar.getByRole('button',{name:'Solid fill',exact:true}).isVisible());
+  await toolbar.locator('[data-action=rasterise]').click();
+  await page.locator('.layer-row.selected .layer-thumb use[href="./icons/ui.svg#image"]').waitFor({state:'attached'});await ready();
+  assert.equal(await toolbar.locator('[data-action=rasterise]').count(),0);
+  await key('Control+z');assert.ok(await toolbar.locator('[data-action=rasterise]').isVisible());
+  assert.ok(await toolbar.getByRole('button',{name:'Solid fill',exact:true}).isVisible());
+  console.log('PASS contextual path actions: anchors, closed-path gradients, solid fill, rasterise and undo');
   assert.deepEqual(errors,[]);
 } finally { await browser.close(); }

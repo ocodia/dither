@@ -46,7 +46,7 @@ const toolController = new ToolController(workspace, {
   controls: $('#tool-options'), selection: pixelSelection, renderer,
   getDocument: () => doc, getAssets: () => assets, getLayer: selected,
   select: id => { selectedId = id; refresh(); }, beforeGesture: finishEdit,
-  patch: commandPatch, preview: requestRender, notify: toast, rasterise,
+  patch: commandPatch, preview: requestRender, notify: toast, rasterise, isRasterising: () => rasterising,
   remove: layer => history.execute(deleteCommand(doc, layer)),
   insert: layer => { const index = selected() ? doc.layers.indexOf(selected()) + 1 : doc.layers.length; selectedId = layer.id; history.execute(insertCommand(doc, layer, index)); },
 });
@@ -64,7 +64,7 @@ function editText(layer = selected()) {
 }
 function selectLayer(id) {
   finishEdit(); selectedId = id;
-  if (selected()?.type === 'text' || hasShapeToolbar(selected())) setTool('move');
+  if (['text', 'shape'].includes(selected()?.type)) setTool('move');
   refresh();
 }
 document.addEventListener('dblclick', e => {
@@ -155,7 +155,7 @@ function refresh() {
   // Keep the focused control alive so typing and Tab navigation survive a commit.
   if (!edit && !activeField) { $('#properties').innerHTML = propertiesHTML(doc, layer, collapsedProperties); $('#effects').innerHTML = effectsHTML(layer, openedEffects); }
   const rasteriseButton = $('[data-action=rasterise]');
-  if (rasteriseButton) { rasteriseButton.disabled = rasterising || layer.locked; rasteriseButton.querySelector('span').textContent = rasterising ? 'Rasterising…' : 'Rasterise'; }
+  if (rasteriseButton) { rasteriseButton.disabled = rasterising || layer.locked || !layer.visible; rasteriseButton.querySelector('span').textContent = rasterising ? 'Rasterising…' : 'Rasterise'; }
   $('#layers').innerHTML = layersHTML(doc, selectedId); $('#layer-count').textContent = doc.layers.length;
   $('#effect-count').textContent = layer?.effects.filter(e => e.enabled).length || 0;
   $('#history').innerHTML = historyHTML(history, hasSaved);
@@ -491,7 +491,7 @@ $('#layers').addEventListener('click', e => {
   toolController.cancel();
   const button = e.target.closest('[data-layer-action]'), row = button?.closest('[data-layer]'); if (!row) return;
   finishEdit(); const layer = doc.layers.find(l => l.id === row.dataset.layer);
-  if (button.dataset.layerAction === 'select' && (selectedId !== layer.id || (layer.type === 'text' || hasShapeToolbar(layer)) && workspace.tool !== 'move')) selectLayer(layer.id);
+  if (button.dataset.layerAction === 'select' && (selectedId !== layer.id || ['text', 'shape'].includes(layer.type) && workspace.tool !== 'move')) selectLayer(layer.id);
   if (button.dataset.layerAction === 'lock') commandPatch(layer, { locked: !layer.locked }, 'Lock layer');
   if (button.dataset.layerAction === 'visibility') commandPatch(layer, { visible: !layer.visible }, 'Layer visibility');
 });

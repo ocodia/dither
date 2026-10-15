@@ -373,21 +373,6 @@ textarea {
   gap: 12px;
   margin-top: 13px;
 }
-.property-action-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.property-action-buttons button {
-  background: var(--field);
-  border: 1px solid #596273;
-  padding: 6px 12px;
-  font-weight: 500;
-}
-.property-action-buttons button:hover:not(:disabled) {
-  background: #343b47;
-  border-color: var(--accent);
-}
 .button-row {
   display: flex;
   gap: 5px;
@@ -610,6 +595,7 @@ dialog label {
   margin-bottom: 16px;
 }
 #new-form select { min-width: 0; max-width: 100%; text-overflow: ellipsis; }
+#new-form input, #new-form select { height: 33px; }
 #swap-dimensions { border-color: var(--line); margin: -4px 0 10px; }
 #preset-note { font-size: 12px; line-height: 1.5; margin-bottom: 16px; }
 dialog .field-grid label {
@@ -1009,6 +995,8 @@ dialog .field-grid label {
 #tool-options { position: absolute; z-index: 5; top: 12px; left: 12px; right: 12px; display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #242830f2; max-height: 35%; overflow: auto; font-size: 12px; cursor: default; }
 #tool-options[hidden] { display: none; }
 #tool-options .typography-options, #tool-options .shape-options { display: contents; }
+#tool-options .layer-toolbar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border-left: 1px solid #505864; padding-left: 12px; }
+#tool-options .layer-toolbar-actions fieldset { display: contents; }
 #text-editor { position: absolute; left: 0; top: 0; z-index: 3; transform-origin: 0 0; overflow: hidden; outline: 1px solid var(--accent); user-select: text; }
 #text-editor[hidden] { display: none; }
 #text-editor textarea { position: absolute; left: 0; width: 100%; min-height: 0; padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent; outline: none; box-shadow: none; resize: none; overflow: hidden; white-space: pre-wrap; overflow-wrap: break-word; user-select: text; cursor: text; }
@@ -1022,6 +1010,11 @@ dialog .field-grid label {
 #tool-options button:hover:not(:disabled) { background: #454f5d; border-color: var(--accent); }
 #tool-options button:active:not(:disabled) { background: #25364e; }
 #tool-options button .icon { font-size: 16px; }
+#tool-options .colour-copy { display: flex; align-items: center; gap: 6px; }
+#tool-options .colour-copy input { height: 30px; padding: 4px 6px; font-family: ui-monospace, monospace; user-select: text; }
+#tool-options [data-colour-format=hex] { width: 86px; }
+#tool-options [data-colour-format=rgb] { width: 164px; }
+#tool-options .colour-copy button { width: 30px; padding: 4px; }
 #selection-tool-toggle { position: relative; }
 #selection-tool-toggle .tool-menu-caret { position: absolute; width: 10px; height: 10px; right: 1px; bottom: 1px; }
 #selection-tool-menu { position: fixed; inset: auto; margin: 0; padding: 6px; width: 265px; max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); overflow: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); box-shadow: 0 8px 30px #0006; }
