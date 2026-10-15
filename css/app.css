@@ -1008,6 +1008,10 @@ dialog .field-grid label {
 .tools > button, .tools > .tool-divider { flex-shrink: 0; }
 #tool-options { position: absolute; z-index: 5; top: 12px; left: 12px; right: 12px; display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #242830f2; max-height: 35%; overflow: auto; font-size: 12px; cursor: default; }
 #tool-options[hidden] { display: none; }
+#tool-options .typography-options { display: contents; }
+#text-editor { position: absolute; left: 0; top: 0; z-index: 3; transform-origin: 0 0; overflow: hidden; outline: 1px solid var(--accent); user-select: text; }
+#text-editor[hidden] { display: none; }
+#text-editor textarea { position: absolute; left: 0; width: 100%; min-height: 0; padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent; outline: none; box-shadow: none; resize: none; overflow: hidden; white-space: pre-wrap; overflow-wrap: break-word; user-select: text; cursor: text; }
 #tool-options label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; margin: 0; white-space: nowrap; color: var(--muted); }
 #tool-options input[type=number] { width: 68px; height: 30px; padding: 4px 6px; }
 #tool-options input[type=color] { width: 34px; height: 30px; padding: 2px; }

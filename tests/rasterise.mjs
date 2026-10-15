@@ -1,3 +1,4 @@
+import { editTextContent } from './text-helpers.js';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -44,8 +45,7 @@ try {
     await page.locator(`[data-action=${kind}]`).click();
     if (kind === 'text') {
       await page.locator('[data-path="text.fontFamily"]').selectOption('Inter');
-      await page.locator('[data-path="text.content"]').fill('Editable after undo');
-      await page.locator('[data-path="text.content"]').press('Tab');
+      await editTextContent(page,'Editable after undo');
     }
     await page.locator('[data-path=locked]').check(); await page.locator('[data-path=locked]').press('Tab');
     assert.ok(await page.locator('[data-action=rasterise]').isDisabled());
@@ -54,7 +54,7 @@ try {
     await page.locator('.layer-row.selected .layer-thumb use[href="./icons/ui.svg#image"]').waitFor({state:'attached'}); await ready();
     assert.equal(await page.locator('[data-action=rasterise]').count(),0);
     await key('Control+z'); assert.ok(await page.locator('[data-action=rasterise]').isVisible());
-    if (kind === 'text') { assert.equal(await page.locator('[data-path="text.content"]').inputValue(),'Editable after undo'); assert.equal(await page.locator('[data-path="text.fontFamily"]').inputValue(),'Inter'); }
+    if (kind === 'text') { await page.locator('[data-text-action=edit]').click(); assert.equal(await page.locator('#text-editor textarea').inputValue(),'Editable after undo'); await page.locator('#text-editor textarea').press('Control+Enter'); assert.equal(await page.locator('[data-path="text.fontFamily"]').inputValue(),'Inter'); }
     await key('Control+Shift+z'); await page.locator('.layer-row.selected .layer-thumb use[href="./icons/ui.svg#image"]').waitFor({state:'attached'});
   }
   assert.equal(await page.locator('#layer-count').textContent(),'5');

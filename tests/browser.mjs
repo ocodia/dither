@@ -1,3 +1,4 @@
+import { editTextContent } from './text-helpers.js';
 import { checkSavedRendering } from './viewport-helpers.js';
 // Optional integration checks. Point DITHER_PLAYWRIGHT_PATH at an external Playwright installation.
 import assert from 'node:assert/strict';
@@ -58,7 +59,7 @@ try {
   await page.waitForFunction(() => document.querySelector('#layer-count').textContent === '2');
   check('Import two original image assets');
   const selectedLayer = () => page.locator('.layer-row.selected');
-  async function property(path, value) { const el = page.locator(`#properties [data-path="${path}"]`); await el.fill(String(value)); await el.press('Tab'); }
+  async function property(path, value) { const el = page.locator(`[data-path="${path}"]`); await el.fill(String(value)); await el.press('Tab'); }
   await property('transform.x',450); await property('transform.y',340); await property('transform.width',380); await property('transform.height',245);
   await property('transform.rotation',-8); await property('opacity',.8);
   await page.locator('[data-action=flip-x]').click(); await page.locator('[data-action=flip-x]').click();
@@ -80,7 +81,7 @@ try {
   await page.waitForFunction(() => document.querySelector('#effect-count').textContent === '7');
   check('Every milestone effect enabled and edited');
 
-  await page.locator('[data-action=text]').click(); await property('text.content','DITHER\nMake it your own.'); await property('text.fontSize',40); await property('transform.x',360); await property('transform.y',160);
+  await page.locator('[data-action=text]').click(); await editTextContent(page,'DITHER\nMake it your own.'); await property('text.fontSize',40); await property('transform.x',360); await property('transform.y',160);
   for (const shape of ['rectangle','ellipse','arrow','line']) { await page.locator(`[data-action=${shape}]`).click(); if (shape==='rectangle') { await property('shape.fill','#93b9ff'); await property('shape.strokeWidth',3); } }
   assert.equal(await page.locator('#layer-count').textContent(),'7');
   await page.locator('[data-action=duplicate]').click(); assert.equal(await page.locator('#layer-count').textContent(),'8');

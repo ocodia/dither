@@ -1,3 +1,4 @@
+import { editTextContent } from './text-helpers.js';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -32,7 +33,7 @@ try {
   });
   assert.deepEqual(firstRender,{loaded:true,same:true});
   for(const family of ['Inter','Noto Sans','Noto Emoji']) {
-    await page.locator('[data-path="text.fontFamily"]').selectOption(family); await page.locator('[data-path="text.content"]').fill('Hello ☀ ★ 😀'); await page.locator('[data-path="text.content"]').press('Tab'); await ready();
+    await page.locator('[data-path="text.fontFamily"]').selectOption(family); await editTextContent(page,'Hello ☀ ★ 😀'); await ready();
     assert.ok(await page.evaluate(family=>[...document.fonts].some(font=>font.family===family&&font.status==='loaded'),family));
   }
   await page.locator('#workspace').focus();await page.keyboard.press('Control+s');await page.getByRole('status').filter({hasText:'Project saved'}).waitFor();

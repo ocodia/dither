@@ -19,7 +19,7 @@ export function textLines(ctx, text, width, spacing) {
   }
   return lines;
 }
-const textFont = text => `${text.fontStyle} ${text.fontWeight} ${text.fontSize}px ${JSON.stringify(text.fontFamily === 'Noto' ? 'Noto Sans' : text.fontFamily)}, Inter, sans-serif`;
+export const textFont = text => `${text.fontStyle} ${text.fontWeight} ${text.fontSize}px ${JSON.stringify(text.fontFamily === 'Noto' ? 'Noto Sans' : text.fontFamily)}, Inter, sans-serif`;
 function drawText(ctx, layer) {
   const t = layer.text, { width, height } = layer.transform;
   ctx.font = textFont(t);
@@ -91,6 +91,7 @@ export class DocumentRenderer {
     const ids = new Set(doc.layers.map(l => l.id)); for (const id of this.cache.keys()) if (!ids.has(id)) this.cache.delete(id);
     const rendered = [];
     for (const layer of doc.layers) if (layer.visible) {
+      if (viewport && this.editingLayerId === layer.id) continue;
       // Pixel effects retain their document-resolution processing. Unprocessed
       // vectors go straight to the screen so zoom never enlarges a cached bitmap.
       const direct = viewport && ['shape', 'text'].includes(layer.type) && !layer.effects.some(e => e.enabled);

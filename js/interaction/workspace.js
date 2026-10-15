@@ -24,7 +24,7 @@ export class Workspace {
     this.view.x = point.x - (point.x - this.view.x) * after / before; this.view.y = point.y - (point.y - this.view.y) * after / before; this.view.zoom = after; this.draw();
   }
   down(e) {
-    if (e.target.closest('button, input, select, label, #tool-options') || ![0, 1].includes(e.button)) return;
+    if (e.target.closest('button, input, select, label, textarea, #text-editor, #tool-options') || ![0, 1].includes(e.button)) return;
     this.beforeGesture(); this.element.focus({ preventScroll: true });
     const point = this.point(e), pan = e.button === 1 || this.space || this.tool === 'hand';
     if (pan) { this.autoFit = false; this.gesture = { type: 'pan', start: { x: e.clientX, y: e.clientY }, view: { ...this.view } }; }
@@ -68,7 +68,8 @@ export class Workspace {
     this.overlay.setAttribute('viewBox', `${-x / zoom} ${-y / zoom} ${width / zoom} ${height / zoom}`);
     const layer = this.getSelected();
     const toolOverlay = this.tools?.overlay();
-    if (toolOverlay != null) this.overlay.innerHTML = toolOverlay;
+    if (this.textEditor?.layer) this.overlay.innerHTML = '';
+    else if (toolOverlay != null) this.overlay.innerHTML = toolOverlay;
     else if (!layer || !layer.visible || layer.locked) this.overlay.innerHTML = '';
     else if (this.pixelSelection && (isSelectionTool(this.tool) || this.pixelSelection.current())) this.overlay.innerHTML = this.pixelSelection.overlay(layer, zoom);
     else if (isLineLayer(layer)) {

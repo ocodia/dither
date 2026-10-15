@@ -25,10 +25,6 @@ export function propertiesHTML(doc, layer, collapsed = new Set()) {
     actions += action('class="rasterise-button" data-action="rasterise" title="Convert to an image, including current effects. Undo restores the editable layer."', 'Rasterise', 'image');
     html += section(`<div class="property-action-buttons" role="group" aria-label="Layer actions">${actions}</div>`);
   }
-  if (layer.type === 'text') {
-    const p = layer.text;
-    html += group("typography", "Typography", `<label>Content<textarea data-path="text.content" spellcheck="false">${escapeHTML(p.content)}</textarea></label><div class="field-full">${select('Font family', 'text.fontFamily', p.fontFamily === 'Noto' ? 'Noto Sans' : p.fontFamily, [['Arial','Arial'],['Courier New','Courier New'],['Georgia','Georgia'],['Inter','Inter'],['Noto Emoji','Noto Emoji'],['Noto Sans','Noto Sans'],['Times New Roman','Times New Roman'],['Trebuchet MS','Trebuchet MS'],['Verdana','Verdana']])}</div><div class="field-grid">${num('Size', 'text.fontSize', p.fontSize, 1, 600)}${select('Weight', 'text.fontWeight', p.fontWeight, [['400','Regular'],['500','Medium'],['700','Bold'],['900','Heavy']])}${select('Style', 'text.fontStyle', p.fontStyle, [['normal','Normal'],['italic','Italic']])}${select('Alignment', 'text.align', p.align, [['left','Left'],['center','Centre'],['right','Right']])}${num('Line height', 'text.lineHeight', p.lineHeight, 0.5, 4, 0.05)}${num('Letter spacing', 'text.letterSpacing', p.letterSpacing, -10, 50, 0.1)}${field('Text colour', 'text.colour', p.colour, 'color')}</div><p class="property-note">Text wraps inside its box. Resize the box to reveal overflowing lines.</p>`);
-  }
   if (layer.type === 'shape') {
     const s = layer.shape, isLine = ['line', 'arrow'].includes(s.kind);
     html += group("shape", s.kind, `<div class="field-grid">${isLine ? '' : field('Fill', 'shape.fill', s.fill, 'color') + num('Fill opacity', 'shape.fillOpacity', s.fillOpacity, 0, 1, 0.01)}${field('Stroke', 'shape.stroke', s.stroke, 'color')}${num('Stroke width', 'shape.strokeWidth', s.strokeWidth, 0, 100)}${num('Stroke opacity', 'shape.strokeOpacity', s.strokeOpacity, 0, 1, 0.01)}${s.kind === 'rectangle' ? num('Corner radius', 'shape.radius', s.radius, 0, 1000) : ''}${s.kind === 'arrow' ? num('Arrowhead size', 'shape.arrowSize', s.arrowSize, 1, 200) + check('Start arrowhead', 'shape.startArrow', s.startArrow) + check('End arrowhead', 'shape.endArrow', s.endArrow) : ''}</div>`);
@@ -52,4 +48,19 @@ export function layersHTML(doc, selected) {
 export function historyHTML(history, hasSaved) {
   const entries = history.entries, current = entries.findIndex(entry => entry.state === history.state);
   return '<div class="history-actions"><button data-action="undo" aria-label="Undo" title="Undo (Ctrl/⌘ Z)">' + icon('arrow-undo') + ' Undo</button><button data-action="redo" aria-label="Redo" title="Redo (Ctrl/⌘ Shift Z)">' + icon('arrow-redo') + ' Redo</button></div><ol class="history-list" aria-label="Document history">' + entries.map((entry, index) => `<li><button data-history-state="${entry.state}" class="history-entry ${index > current ? 'undone' : ''}" ${entry.state === history.state ? 'aria-current="step"' : ''}><span class="history-marker">${icon(entry.state === history.state ? 'checkmark-circle' : 'history')}</span><span class="history-label">${escapeHTML(entry.label)}</span>${hasSaved && entry.state === history.saved ? '<small>Saved</small>' : ''}</button></li>`).join('') + '</ol>';
+}
+
+export function typographyHTML(layer, editing = false) {
+  const p = layer.text;
+  return `${icon('text-t')}<fieldset class="typography-options" ${layer.locked || !layer.visible ? 'disabled' : ''}>
+    ${select('Font', 'text.fontFamily', p.fontFamily === 'Noto' ? 'Noto Sans' : p.fontFamily, [['Arial','Arial'],['Courier New','Courier New'],['Georgia','Georgia'],['Inter','Inter'],['Noto Emoji','Noto Emoji'],['Noto Sans','Noto Sans'],['Times New Roman','Times New Roman'],['Trebuchet MS','Trebuchet MS'],['Verdana','Verdana']])}
+    ${num('Size', 'text.fontSize', p.fontSize, 1, 600)}
+    ${select('Weight', 'text.fontWeight', p.fontWeight, [['400','Regular'],['500','Medium'],['700','Bold'],['900','Heavy']])}
+    ${select('Style', 'text.fontStyle', p.fontStyle, [['normal','Normal'],['italic','Italic']])}
+    ${select('Alignment', 'text.align', p.align, [['left','Left'],['center','Centre'],['right','Right']])}
+    ${num('Line height', 'text.lineHeight', p.lineHeight, .5, 4, .05)}
+    ${num('Letter spacing', 'text.letterSpacing', p.letterSpacing, -10, 50, .1)}
+    ${field('Colour', 'text.colour', p.colour, 'color')}
+    <button type="button" data-text-action="${editing ? 'done' : 'edit'}">${editing ? 'Done' : 'Edit text'}</button>
+    </fieldset>`;
 }

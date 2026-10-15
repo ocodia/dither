@@ -32,7 +32,7 @@ To deploy on GitHub Pages, publish the directory as static files. All app, icon,
 - Eyedropper, round brush, eraser, connected flood fill, editable Bézier paths and editable linear/radial gradient fills.
 - Ordered image, text, rectangle, ellipse, line, arrow and path layers. Select on canvas or in the layer list; rename, duplicate, delete, reorder, hide, lock and set opacity.
 - Move, eight resize handles, rotation and flips. Shift preserves proportions/snaps rotation; Alt/Option resizes from the centre. Numeric transform controls provide keyboard-accessible alternatives.
-- Editable text content, font, weight/style, colour, alignment, line height, letter spacing and wrapping within a text box. Bundled Inter, Noto Sans and Noto Emoji options work offline; the app UI uses Inter. Older projects using the Noto option now render with Noto Sans.
+- Select a text layer to use its typography toolbar: font, weight/style, size, colour, alignment, line height and letter spacing. Double-click text on the canvas or its layer row, or choose **Edit text**, to type directly in its box. Enter inserts a new line; **Done**, Ctrl/⌘ Enter or clicking outside finishes the edit; Escape cancels the current draft. Typing uses native caret selection, clipboard, undo and IME input; completed edits support document undo/redo. Text wraps and clips inside its resizable box. Bundled Inter, Noto Sans and Noto Emoji options work offline; the app UI uses Inter. Older projects using the Noto option now render with Noto Sans.
 - Editable shape fill, stroke and opacity, rectangle corners and configurable arrowheads.
 - Rasterise text, rectangles, ellipses, lines and arrows from Properties into image layers, baking current effects while preserving appearance and stacking order. Undo restores the editable layer during the session.
 - Brightness, contrast, monochrome Floyd–Steinberg dithering, colour overlay, outside stroke, blur and drop shadow. Each effect can be enabled, configured and reset independently.
@@ -125,6 +125,7 @@ node tests/drawing-tools.mjs
 node tests/pen-paths.mjs
 node tests/painting-engine.mjs
 node tests/blur.mjs
+node tests/text-editing.mjs
 ```
 
 Start the static server first. `DITHER_URL` can target a subdirectory deployment (include the trailing slash); `DITHER_BROWSER` overrides the default `msedge` channel. Each integration run uses a fresh temporary browser profile and writes screenshots and a PNG to `.test-results/`.

@@ -6,6 +6,7 @@ import { AssetStore } from './storage/assets.js';
 import { saveProject, loadProject, listProjects } from './storage/projects.js';
 import { DocumentRenderer } from './rendering/renderer.js';
 import { Workspace } from './interaction/workspace.js';
+import { TextEditor } from './interaction/text-editor.js';
 import { propertiesHTML, effectsHTML, layersHTML, historyHTML, escapeHTML, icon } from './components/panels.js';
 import { setupPanelResizer } from './components/panel-resizer.js';
 import { ContextMenu } from './components/context-menu.js';
@@ -26,9 +27,10 @@ let layerClipboard = null, layerPasting = false;
 const contextMenu = new ContextMenu();
 const history = new History(() => refresh());
 const workspace = new Workspace({ element: $('#workspace'), stage: $('#stage'), overlay: $('#overlay'), getDocument: () => doc, getSelected: selected,
-  select: id => { finishEdit(); selectedId = id; refresh(); }, preview: () => requestRender(), beforeGesture: () => finishEdit(),
+  select: id => selectLayer(id), preview: () => requestRender(), beforeGesture: () => finishEdit(),
   commit: (layer, before, after) => { if (JSON.stringify(before) !== JSON.stringify(after)) history.record(patchCommand(layer, { transform: before }, { transform: after }, 'Transform layer')); else refresh(); },
   onView: view => {
+    workspace.textEditor?.draw();
     $('#zoom-value').textContent = `${Math.round(view.zoom * 100)}%`;
     const viewport = JSON.stringify([view, $('#workspace').clientWidth, $('#workspace').clientHeight, devicePixelRatio]);
     if (viewport !== lastViewport) { lastViewport = viewport; requestRender(); }
@@ -49,6 +51,29 @@ const toolController = new ToolController(workspace, {
   insert: layer => { const index = selected() ? doc.layers.indexOf(selected()) + 1 : doc.layers.length; selectedId = layer.id; history.execute(insertCommand(doc, layer, index)); },
 });
 workspace.tools = toolController;
+const textEditor = new TextEditor({ workspace, controls: $('#tool-options'), renderer,
+  getLayer: selected, getDocument: () => doc, preview: requestRender, onDirty: updateSaveButton,
+  record: (layer, before, after) => history.record(patchCommand(layer, { text: before }, { text: after }, 'Edit text')),
+  onFinish: () => toolController.renderControls()
+});
+workspace.textEditor = textEditor;
+function editText(layer = selected()) {
+  if (layer?.type !== 'text' || layer.locked || !layer.visible) return;
+  finishEdit(); workspace.finish(); selectedId = layer.id; setTool('move'); refresh();
+  textEditor.begin(layer); toolController.renderControls();
+}
+function selectLayer(id) {
+  finishEdit(); selectedId = id;
+  if (selected()?.type === 'text') setTool('move');
+  refresh();
+}
+document.addEventListener('dblclick', e => {
+  if (e.target.closest('#text-editor, #tool-options')) return;
+  const row = e.target.closest('#layers [data-layer]');
+  if (row && !e.target.closest('.layer-select')) return;
+  const layer = row ? doc.layers.find(l => l.id === row.dataset.layer) : e.target.closest('#workspace') ? hitTest(doc.layers, workspace.point(e), 6 / workspace.view.zoom, true) : null;
+  if (layer?.type === 'text') { e.preventDefault(); e.stopPropagation(); editText(layer); }
+}, true);
 function updatePixelUI() {
   const hasRegion = !!pixelSelection.current(), drawing = !!pixelSelection.draft;
   $('#pixel-actions').hidden = !hasRegion && !isSelectionTool(workspace.tool) && !pixelClipboard;
@@ -120,6 +145,7 @@ async function render() {
 }
 function refresh() {
   contextMenu.close(false);
+  textEditor.sync();
   toolController.sync();
   collectAssets();
   if (!doc.layers.some(l => l.id === selectedId)) selectedId = null;
@@ -146,7 +172,7 @@ function collectAssets() {
 function commandPatch(target, changes, label) { const before = {}; for (const key of Object.keys(changes)) before[key] = clone(target[key]); history.execute(patchCommand(target, before, changes, label)); }
 function updateSaveButton() {
   const draftChanged = edit && Object.keys(edit.before).some(key => JSON.stringify(edit.before[key]) !== JSON.stringify(edit.target[key]));
-  $('[data-action=save]').disabled = saving || (hasSaved && !history.dirty && !draftChanged);
+  $('[data-action=save]').disabled = saving || (hasSaved && !history.dirty && !draftChanged && !textEditor.dirty);
 }
 function addLayer(kind, placement = false) {
   finishEdit(); const layer = createLayer(kind === 'text' ? 'text' : 'shape', doc.canvas);
@@ -160,7 +186,9 @@ function addLayer(kind, placement = false) {
   if (kind === 'text') layer.text.fontSize = Math.max(8, Math.round(layer.text.fontSize * scale));
   const position = placement === true ? workspace.pointer && workspace.point(workspace.pointer) : placement;
   if (position) Object.assign(layer.transform, position);
-  selectedId = layer.id; history.execute(insertCommand(doc, layer)); setTab('properties');
+  selectedId = layer.id;
+  if (kind === 'text') setTool('move');
+  history.execute(insertCommand(doc, layer)); setTab('properties');
 }
 async function importFiles(files) {
   finishEdit(); const epoch = documentEpoch, destination = assets;
@@ -213,7 +241,8 @@ function replaceDocument(nextDoc, nextAssets, saved = false) {
 }
 function startEdit(control) {
   toolController.cancel();
-  if (edit?.control === control) return; finishEdit();
+  if (edit?.control === control) return;
+  textEditor.checkpoint(); finishPropertyEdit();
   const target = selected() || doc;
   edit = { control, target, before: clone(target) };
 }
@@ -238,6 +267,9 @@ function changeField(control) {
   requestRender(); workspace.draw(); updateSaveButton();
 }
 function finishEdit() {
+  textEditor.finish(); finishPropertyEdit();
+}
+function finishPropertyEdit() {
   if (!edit) return;
   const { target, before } = edit; edit = null;
   if (target === doc) target.name = target.name.trim() || 'Untitled';
@@ -383,6 +415,7 @@ function updateToolAvailability() {
   if (!toolController.canUse(workspace.tool)) setTool('move');
 }
 function setTool(tool) {
+  textEditor.finish();
   if (!toolController.canUse(tool)) return;
   workspace.setTool(tool); toolController.renderControls(); updatePixelUI();
   for (const el of document.querySelectorAll('[data-tool]')) el.setAttribute('aria-pressed', el.dataset.tool === tool);
@@ -428,20 +461,25 @@ $('#history').addEventListener('keydown', e => {
   const next = e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1 : index + (e.key === 'ArrowDown' ? 1 : -1);
   buttons[Math.max(0, Math.min(buttons.length - 1, next))]?.click();
 });
-for (const id of ['properties', 'effects']) {
+for (const id of ['properties', 'effects', 'tool-options']) {
   const container = $(`#${id}`);
   container.addEventListener('input', e => { if (e.target.dataset.path) changeField(e.target); });
   container.addEventListener('change', e => {
     if (!e.target.dataset.path) return;
     if (!edit) changeField(e.target);
-    finishEdit();
+    finishPropertyEdit();
     if (e.target.type === 'checkbox') {
       const path = e.target.dataset.path; e.target.blur(); refresh();
       container.querySelector(`[data-path="${path}"]`)?.focus({ preventScroll: true });
     } else refresh();
   });
-  container.addEventListener('focusout', () => finishEdit());
+  container.addEventListener('focusout', () => finishPropertyEdit());
 }
+$('#tool-options').addEventListener('click', e => {
+  const action = e.target.closest('[data-text-action]')?.dataset.textAction;
+  if (action === 'edit') editText();
+  if (action === 'done') finishEdit();
+});
 $('#effects').addEventListener('toggle', e => { const type = e.target.dataset.effect; if (type) e.target.open ? openedEffects.add(type) : openedEffects.delete(type); }, true);
 $('#properties').addEventListener('toggle', e => {
   const section = e.target.dataset.section;
@@ -451,7 +489,7 @@ $('#layers').addEventListener('click', e => {
   toolController.cancel();
   const button = e.target.closest('[data-layer-action]'), row = button?.closest('[data-layer]'); if (!row) return;
   finishEdit(); const layer = doc.layers.find(l => l.id === row.dataset.layer);
-  if (button.dataset.layerAction === 'select') { selectedId = layer.id; refresh(); }
+  if (button.dataset.layerAction === 'select' && (selectedId !== layer.id || layer.type === 'text' && workspace.tool !== 'move')) selectLayer(layer.id);
   if (button.dataset.layerAction === 'lock') commandPatch(layer, { locked: !layer.locked }, 'Lock layer');
   if (button.dataset.layerAction === 'visibility') commandPatch(layer, { visible: !layer.visible }, 'Layer visibility');
 });

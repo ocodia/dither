@@ -1,4 +1,4 @@
-import { icon } from '../components/panels.js';
+import { icon, typographyHTML } from '../components/panels.js';
 import { clone, createLayer, checkSize } from '../model/document.js';
 import { isSelectionTool } from '../model/pixel-region.js';
 import { canGradient, isPath, pathBounds, tracePath, validGradient, editableStops, addGradientStop, gradientOffset } from '../model/vector.js';
@@ -86,6 +86,10 @@ export class ToolController {
   updateFinishButton(){const button=this.controls.querySelector('[data-tool-action="finish-path"]');if(button){button.disabled=!this.canFinishPath();button.hidden=!this.canFinishPath();}}
   renderControls(){
     const tool=this.workspace.tool,s=this.settings,l=this.getLayer();
+    if(tool==='move'&&l?.type==='text'){
+      this.controls.hidden=false;this.controls.setAttribute('aria-label','Typography options');
+      this.controlsLayer=l;this.controls.innerHTML=typographyHTML(l,!!this.workspace.textEditor?.layer);return;
+    }
     this.controls.hidden=!this.active();if(!this.active())return;
     this.controls.setAttribute('aria-label',`${names[tool]} tool options`);
     let html=icon(toolIcons[tool]);
@@ -231,7 +235,7 @@ export class ToolController {
     this.patch(l,{shape},'Edit gradient');this.renderControls();
   }
   route(type,e){
-    if(e.target.closest('#tool-options, button, input, select, label'))return;
+    if(e.target.closest('#tool-options, #text-editor, button, input, select, label, textarea'))return;
     const w=this.workspace,ps=this.selection;
     if(type==='pointercancel'||type==='lostpointercapture'){
       if(this.gesture?.pointerId===e.pointerId)this.cancel();
