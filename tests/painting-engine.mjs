@@ -31,6 +31,7 @@ try{
     const {surface}=await import('./js/rendering/effects.js');
     const {pngBlob}=await import('./js/rendering/paint.js');
     const {History,patchCommand}=await import('./js/history/history.js');
+    const {localToWorld}=await import('./js/interaction/geometry.js');
     const results=[];
     for(const tool of ['brush','eraser'])for(const hardness of [1,.5]){
       const doc=createDocument({width:256,height:256}),assets=new AssetStore(),source=surface(16,16);
@@ -57,12 +58,35 @@ try{
       // Repeating after a committed stroke reuses the expanded resolution.
       controller.down({world:{x:layer.transform.x+10,y:layer.transform.y}});
       const reused=controller.gesture.base.width===256&&controller.gesture.base.height===64;
-      controller.cancel();assets.dispose();results.push({tool,hardness,partial,sized,detail,committed,undo,redo,reused,errors});
+      controller.cancel();
+      const event=(x,y)=>({world:localToWorld({x:x-128,y:y-32},layer.transform)});
+      const finish=async e=>{controller.up(e);while(controller.busy)await new Promise(resolve=>setTimeout(resolve,1));};
+      const count=history.undoStack.length,previous=layer.assetId;
+      controller.down(event(-40,10));await finish(event(-30,10));
+      const outsideNoOp=history.undoStack.length===count&&layer.assetId===previous;
+      // A dab whose centre is outside can still overlap the bitmap edge.
+      controller.down(event(-3,10));
+      const alpha=(x,y)=>controller.gesture.output.getContext('2d').getImageData(x,y,1,1).data[3];
+      const edgeOverlap=tool==='brush'?alpha(0,10)>128:alpha(0,10)<128;
+      controller.cancel();
+      const cancelled=layer.assetId===previous&&history.undoStack.length===count;
+      controller.down(event(-30,10));controller.move(event(35,10));
+      controller.move(event(280,10));controller.move(event(220,10));
+      const enters=tool==='brush'?alpha(2,10)===255:alpha(2,10)===0;
+      const reenters=tool==='brush'?alpha(240,10)===255:alpha(240,10)===0;
+      await finish(event(220,10));
+      const oneStroke=history.undoStack.length===count+1;
+      history.undo();const boundaryUndo=layer.assetId===previous;
+      history.redo();
+      // Fill outside the image remains a no-op.
+      workspace.tool='fill';controller.down(event(-30,10));const fillOutside=!controller.gesture;
+      controller.cancel();assets.dispose();results.push({tool,hardness,partial,sized,detail,committed,undo,redo,reused,outsideNoOp,edgeOverlap,cancelled,enters,reenters,oneStroke,boundaryUndo,fillOutside,errors});
     }
     return results;
   });
-  for(const result of resolution){assert.deepEqual(result.errors,[]);for(const key of ['sized','detail','committed','undo','redo','reused'])assert.equal(result[key],true,`${key}: ${JSON.stringify(result)}`);}
+  for(const result of resolution){assert.deepEqual(result.errors,[]);for(const key of ['sized','detail','committed','undo','redo','reused','outsideNoOp','edgeOverlap','cancelled','enters','reenters','oneStroke','boundaryUndo','fillOutside'])assert.equal(result[key],true,`${key}: ${JSON.stringify(result)}`);}
   console.log('PASS brush and eraser expand stretched bitmaps, preserve edge detail, commit and undo/redo');
+  console.log('PASS outside-start strokes enter and reenter rotated/flipped layers, edge overlap, cancellation and outside-only no-ops');
   const result=await page.evaluate(async()=>{
     const {ToolController}=await import('./js/interaction/tools.js');
     const {createDocument,createLayer,clone}=await import('./js/model/document.js');

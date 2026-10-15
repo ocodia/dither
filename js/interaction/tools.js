@@ -269,7 +269,9 @@ export class ToolController {
       if(!this.eligible()){this.notify('Select an unlocked image or create a paint layer.');return;}
       try{
         const base=paintSurface(l,this.getAssets().images.get(l.assetId),tool!=='fill'),point=sourcePoint(p,l.transform,base.width,base.height);
-        if(point.x<0||point.y<0||point.x>=base.width||point.y>=base.height)return;
+        // Strokes can begin outside the bitmap; canvas clipping limits their
+        // marks to the layer. Flood fill still needs an actual source pixel.
+        if(tool==='fill'&&(point.x<0||point.y<0||point.x>=base.width||point.y>=base.height))return;
         const mask=selectionMask(this.selection.current()?.points,base.width,base.height);
         this.gesture={type:tool,layer:l,snapshot:clone(l),document:this.getDocument(),assets:this.getAssets(),base,mask,last:point,scale:brushScale(l.transform,base.width,base.height),settings:{...this.settings,opacity:tool==='brush'?1:this.settings.opacity}};
         if(tool==='fill'){this.fill(point);return;}
