@@ -61,7 +61,7 @@ export function validateDocument(doc) {
       const s = layer.shape;
       if (s.kind === 'path' && !validPath(s)) throw new Error('Invalid path anchors.');
       if (s.gradient !== undefined && (!canGradient(layer) || !validGradient(s.gradient))) throw new Error('Invalid gradient fill.');
-      if (!colour(s.fill) || !colour(s.stroke) || !finite(s.fillOpacity,0,1) || !finite(s.strokeOpacity,0,1) || !finite(s.strokeWidth,0,100) || !finite(s.radius,0,1000) || !finite(s.arrowSize,1,200) || typeof s.startArrow !== 'boolean' || typeof s.endArrow !== 'boolean') throw new Error('Invalid shape style.');
+      if (!colour(s.fill) || !colour(s.stroke) || !finite(s.fillOpacity,0,1) || !finite(s.strokeOpacity,0,1) || !finite(s.strokeWidth,0,100) || !finite(s.radius,0,1000) || !finite(s.arrowSize,1,500) || typeof s.startArrow !== 'boolean' || typeof s.endArrow !== 'boolean') throw new Error('Invalid shape style.');
     }
     const effectIds = new Set();
     for (const effect of layer.effects) {

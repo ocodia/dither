@@ -1,4 +1,4 @@
-import { icon, typographyHTML } from '../components/panels.js';
+import { icon, typographyHTML, hasShapeToolbar, shapeOptionsHTML } from '../components/panels.js';
 import { clone, createLayer, checkSize } from '../model/document.js';
 import { isSelectionTool } from '../model/pixel-region.js';
 import { canGradient, isPath, pathBounds, tracePath, validGradient, editableStops, addGradientStop, gradientOffset } from '../model/vector.js';
@@ -20,7 +20,7 @@ const anchor=p=>({...p,in:{...p},out:{...p}});
 const field=(label,key,value,min,max,step=1)=>`<label><span>${label}</span><input data-setting="${key}" type="number" value="${value}" min="${min}" max="${max}" step="${step}"></label>`;
 
 const toolButton=(action,label,glyph,disabled=false)=>`<button type="button" data-tool-action="${action}" title="${label}" ${disabled?'disabled':''}>${icon(glyph)}<span>${label}</span></button>`;
-const slider=(label,key,value,min,max,step=1,scope='setting',accessibleLabel=label)=>`<label class="tool-slider"><span>${label}</span><input aria-label="${accessibleLabel}" data-${scope}="${key}" type="range" min="${min}" max="${max}" step="${step}" value="${value}"><output>${max===1?Math.round(value*100)+'%':value}</output></label>`;
+const slider=(label,key,value,min,max,step=1,scope='setting',accessibleLabel=label)=>`<label class="tool-slider"><span>${label}</span><input aria-label="${accessibleLabel}" data-${scope}="${key}" type="range" min="${min}" max="${max}" step="${step}" value="${value}">${/opacity/i.test(key)?'':`<output>${max===1?Math.round(value*100)+'%':value}</output>`}</label>`;
 
 export class ToolController {
   constructor(workspace,options) {
@@ -39,9 +39,9 @@ export class ToolController {
     this.controls.addEventListener('input',e=>{
       if(e.target.dataset.stop){this.changeStop(e.target,false);}
       if(e.target.dataset.penStyle){this.changePenStyle(e.target,false);}
-      if(e.target.type!=='range')return;
+      if(e.target.type!=='range'||e.target.dataset.path)return;
       const output=e.target.closest('label').querySelector('output');
-      output.value=Number(e.target.max)===1?Math.round(Number(e.target.value)*100)+'%':e.target.value;
+      if(output)output.value=Number(e.target.max)===1?Math.round(Number(e.target.value)*100)+'%':e.target.value;
       if(e.target.dataset.setting)this.change(e);
     });
     document.addEventListener('click',e=>this.action(e));
@@ -73,6 +73,7 @@ export class ToolController {
   world(p,layer){const t=layer.transform;return localToWorld({x:(p.x-.5)*t.width,y:(p.y-.5)*t.height},t);}
   sync(){
     const layer=this.getLayer();
+    if(this.workspace.tool==='move'&&hasShapeToolbar(layer)&&!layer.shape.gradient)this.controls.querySelector('[data-tool-action="solid"]')?.remove();
     if(this.pathLayer && (layer!==this.pathLayer || layer.locked || !layer.visible || !this.getDocument().layers.includes(layer)))this.cancel();
     if(this.gesture && (this.gesture.layer && (layer!==this.gesture.layer||layer.locked||!layer.visible)))this.cancel();
     if(this.gradientEdit&&(this.gradientEdit.layer!==this.gradientState().layer||this.gradientState().disabled||this.gradientEdit.document!==this.getDocument()))this.finishGradientEdit(false);
@@ -86,6 +87,10 @@ export class ToolController {
   updateFinishButton(){const button=this.controls.querySelector('[data-tool-action="finish-path"]');if(button){button.disabled=!this.canFinishPath();button.hidden=!this.canFinishPath();}}
   renderControls(){
     const tool=this.workspace.tool,s=this.settings,l=this.getLayer();
+    if(tool==='move'&&hasShapeToolbar(l)){
+      this.controls.hidden=false;this.controls.setAttribute('aria-label',`${l.shape.kind[0].toUpperCase()+l.shape.kind.slice(1)} options`);
+      this.controlsLayer=l;this.controls.innerHTML=shapeOptionsHTML(l);return;
+    }
     if(tool==='move'&&l?.type==='text'){
       this.controls.hidden=false;this.controls.setAttribute('aria-label','Typography options');
       this.controlsLayer=l;this.controls.innerHTML=typographyHTML(l,!!this.workspace.textEditor?.layer);return;
@@ -96,10 +101,10 @@ export class ToolController {
     if(tool==='pen'){
       const target=this.penStyleTarget(),style=target?.shape || this.penStyle;
       const disabled=target&&(target.locked||!target.visible);
-      html+=`<fieldset class="pen-style-options" aria-label="Fill" ${disabled?'disabled':''}><label>Fill<input aria-label="Path fill colour" data-pen-style="fill" type="color" value="${style.fill}"></label>${slider('Opacity','fillOpacity',style.fillOpacity,0,1,.01,'pen-style','Fill opacity')}</fieldset><fieldset class="pen-style-options pen-stroke-options" aria-label="Stroke" ${disabled?'disabled':''}><label>Stroke<input aria-label="Path stroke colour" data-pen-style="stroke" type="color" value="${style.stroke}"></label>${slider('Width','strokeWidth',style.strokeWidth,0,100,1,'pen-style','Stroke width')}${slider('Opacity','strokeOpacity',style.strokeOpacity,0,1,.01,'pen-style','Stroke opacity')}</fieldset>`;
+      html+=`<fieldset class="pen-style-options" aria-label="Fill" ${disabled?'disabled':''}><label>Fill<input aria-label="Path fill colour" data-pen-style="fill" type="color" value="${style.fill}"></label>${slider('Opacity','fillOpacity',style.fillOpacity,0,1,.05,'pen-style','Fill opacity')}</fieldset><fieldset class="pen-style-options pen-stroke-options" aria-label="Stroke" ${disabled?'disabled':''}><label>Stroke<input aria-label="Path stroke colour" data-pen-style="stroke" type="color" value="${style.stroke}"></label>${slider('Width','strokeWidth',style.strokeWidth,0,100,1,'pen-style','Stroke width')}${slider('Opacity','strokeOpacity',style.strokeOpacity,0,1,.05,'pen-style','Stroke opacity')}</fieldset>`;
     }else if(tool==='brush')html+=`<label>Colour<input aria-label="Brush colour" data-setting="foreground" type="color" value="${s.foreground}"></label>`;
     else if(!['gradient','eraser'].includes(tool))html+=`<label>Foreground<input aria-label="Foreground colour" data-setting="foreground" type="color" value="${s.foreground}"></label><label>Background<input aria-label="Background colour" data-setting="background" type="color" value="${s.background}"></label>`;
-    if(['eraser','fill','eyedropper'].includes(tool))html+=slider('Opacity','opacity',s.opacity,0,1,.01);
+    if(['eraser','fill','eyedropper'].includes(tool))html+=slider('Opacity','opacity',s.opacity,0,1,.05);
     if(['brush','eraser'].includes(tool))html+=field('Size (px)','size',s.size,1,1024)+slider('Hardness','hardness',s.hardness,0,1,.01);
     if(tool==='fill')html+=slider('Tolerance','tolerance',s.tolerance,0,255);
     if(tool==='pen'){
@@ -126,7 +131,7 @@ export class ToolController {
       const label=`Stop ${i+1}`,id=`gradient-stop-${stop.order}`;
       html+=`<div class="gradient-stop" data-stop-order="${stop.order}"><span>${label}</span><button type="button" class="gradient-swatch" data-tool-action="edit-stop" aria-label="${label} colour and opacity" aria-haspopup="dialog" aria-controls="${id}" style="--stop-colour:${stop.colour};--stop-opacity:${stop.opacity}"><span></span></button>`;
       if(stop.order>1)html+=`<button type="button" data-tool-action="remove-stop" aria-label="Remove ${label.toLowerCase()}" title="Remove ${label.toLowerCase()}">${icon('delete')}</button>`;
-      html+=`<div id="${id}" class="gradient-colour-editor" popover role="dialog" aria-label="${label} colour and opacity"><label>Colour<input aria-label="${label} colour" data-stop="colour" type="color" value="${stop.colour}"></label>${slider('Opacity','opacity',stop.opacity,0,1,.01,'stop',label+' opacity')}${toolButton('sample-stop','Pick stop colour','eyedropper')}</div></div>`;
+      html+=`<div id="${id}" class="gradient-colour-editor" popover role="dialog" aria-label="${label} colour and opacity"><label>Colour<input aria-label="${label} colour" data-stop="colour" type="color" value="${stop.colour}"></label>${slider('Opacity','opacity',stop.opacity,0,1,.05,'stop',label+' opacity')}${toolButton('sample-stop','Pick stop colour','eyedropper')}</div></div>`;
     });
     return html+`</div><div class="gradient-add">${toolButton('add-stop','Add stop','add',stops.length>=6)}</div></fieldset>`;
   }

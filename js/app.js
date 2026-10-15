@@ -7,7 +7,7 @@ import { saveProject, loadProject, listProjects } from './storage/projects.js';
 import { DocumentRenderer } from './rendering/renderer.js';
 import { Workspace } from './interaction/workspace.js';
 import { TextEditor } from './interaction/text-editor.js';
-import { propertiesHTML, effectsHTML, layersHTML, historyHTML, escapeHTML, icon } from './components/panels.js';
+import { propertiesHTML, effectsHTML, layersHTML, historyHTML, escapeHTML, icon, hasShapeToolbar } from './components/panels.js';
 import { setupPanelResizer } from './components/panel-resizer.js';
 import { ContextMenu } from './components/context-menu.js';
 import { setupDocumentPresets } from './components/document-presets.js';
@@ -64,7 +64,7 @@ function editText(layer = selected()) {
 }
 function selectLayer(id) {
   finishEdit(); selectedId = id;
-  if (selected()?.type === 'text') setTool('move');
+  if (selected()?.type === 'text' || hasShapeToolbar(selected())) setTool('move');
   refresh();
 }
 document.addEventListener('dblclick', e => {
@@ -187,7 +187,7 @@ function addLayer(kind, placement = false) {
   const position = placement === true ? workspace.pointer && workspace.point(workspace.pointer) : placement;
   if (position) Object.assign(layer.transform, position);
   selectedId = layer.id;
-  if (kind === 'text') setTool('move');
+  if (kind === 'text' || hasShapeToolbar(layer)) setTool('move');
   history.execute(insertCommand(doc, layer)); setTab('properties');
 }
 async function importFiles(files) {
@@ -254,13 +254,15 @@ function changeField(control) {
   if (control.type === 'number' || control.type === 'range') {
     if (control.value === '' || !Number.isFinite(value)) return;
     value = Math.min(Number(control.max || Infinity), Math.max(Number(control.min || -Infinity), value));
-    if (control.type === 'range') control.closest('label').querySelector('output').value = value;
+    const output = control.type === 'range' && control.closest('label').querySelector('output');
+    if (output) output.value = value;
   }
   if (path.startsWith('effect:')) { const [type, key] = path.slice(7).split('.'); setEffect(target, type, { [key]: value }); }
   else if (path === 'transparent') target.canvas.background = value ? null : '#ffffff';
   else {
     const keys = path.split('.'); let object = target; for (const key of keys.slice(0, -1)) object = object[key];
     const key = keys.at(-1), previous = object[key]; object[key] = value;
+    if (path === 'shape.fill' && hasShapeToolbar(target)) delete target.shape.gradient;
     if (path.startsWith('canvas.')) { try { checkSize(target.canvas.width, target.canvas.height); } catch { object[key] = previous; } }
     if (path === 'transform.width' || path === 'transform.height') { if (target.transform.width * target.transform.height > 32_000_000) { object[key] = previous; toast('Keep layer dimensions below 32 million pixels.', true); } }
   }
@@ -489,7 +491,7 @@ $('#layers').addEventListener('click', e => {
   toolController.cancel();
   const button = e.target.closest('[data-layer-action]'), row = button?.closest('[data-layer]'); if (!row) return;
   finishEdit(); const layer = doc.layers.find(l => l.id === row.dataset.layer);
-  if (button.dataset.layerAction === 'select' && (selectedId !== layer.id || layer.type === 'text' && workspace.tool !== 'move')) selectLayer(layer.id);
+  if (button.dataset.layerAction === 'select' && (selectedId !== layer.id || (layer.type === 'text' || hasShapeToolbar(layer)) && workspace.tool !== 'move')) selectLayer(layer.id);
   if (button.dataset.layerAction === 'lock') commandPatch(layer, { locked: !layer.locked }, 'Lock layer');
   if (button.dataset.layerAction === 'visibility') commandPatch(layer, { visible: !layer.visible }, 'Layer visibility');
 });
