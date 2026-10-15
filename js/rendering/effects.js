@@ -37,6 +37,20 @@ async function pixelEffect(canvas, effect) {
   }) : processPixels(pixels.data, width, height, effect);
   ctx.putImageData(new ImageData(data, width, height), 0, 0); return canvas;
 }
+let nativeBlur;
+function supportsBlur() {
+  if (nativeBlur !== undefined) return nativeBlur;
+  const ctx = surface(9, 9).getContext('2d');
+  if (!('filter' in ctx)) return nativeBlur = false;
+  ctx.filter = 'blur(1px)'; ctx.fillRect(4, 4, 1, 1);
+  return nativeBlur = ctx.getImageData(3, 4, 1, 1).data[3] > 0;
+}
+async function blur(canvas, radius) {
+  if (!radius) return canvas;
+  if (!supportsBlur()) return pixelEffect(canvas, { type: 'blur', radius });
+  const out = surface(canvas.width, canvas.height), ctx = out.getContext('2d');
+  ctx.filter = `blur(${radius}px)`; ctx.drawImage(canvas, 0, 0); return out;
+}
 export const effectRegistry = {
   brightness: pixelEffect, contrast: pixelEffect, dither: pixelEffect, stroke: pixelEffect,
   'colour-overlay': async (canvas, e) => {
@@ -44,12 +58,12 @@ export const effectRegistry = {
     const original = canvas.getContext('2d'); original.globalCompositeOperation = 'source-atop'; original.globalAlpha = e.opacity; original.fillStyle = e.colour; original.fillRect(0, 0, canvas.width, canvas.height); original.globalAlpha = 1; original.globalCompositeOperation = 'source-over';
     return canvas;
   },
-  blur: async (canvas, e) => { const out = surface(canvas.width, canvas.height), ctx = out.getContext('2d'); ctx.filter = `blur(${e.radius}px)`; ctx.drawImage(canvas, 0, 0); return out; },
+  blur: (canvas, e) => blur(canvas, e.radius),
   'drop-shadow': async (canvas, e) => {
     const shadow = surface(canvas.width, canvas.height), s = shadow.getContext('2d');
     s.drawImage(canvas, 0, 0); s.globalCompositeOperation = 'source-in'; s.fillStyle = e.colour; s.fillRect(0, 0, shadow.width, shadow.height);
     const out = surface(canvas.width, canvas.height), ctx = out.getContext('2d');
-    ctx.globalAlpha = e.opacity; ctx.filter = `blur(${e.blur}px)`; ctx.drawImage(shadow, e.offsetX, e.offsetY); ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.drawImage(canvas, 0, 0); return out;
+    ctx.globalAlpha = e.opacity; ctx.drawImage(await blur(shadow, e.blur), e.offsetX, e.offsetY); ctx.globalAlpha = 1; ctx.drawImage(canvas, 0, 0); return out;
   }
 };
 export async function applyEffects(canvas, effects) {

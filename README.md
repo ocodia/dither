@@ -93,7 +93,7 @@ tools/                      Dependency-free dev server and optional icon regener
 
 **Rendering.** `DocumentRenderer.renderDocument(document, assets, canvas)` draws document state independently of the UI. A layer is rasterised in local coordinates, processed through its ordered effects, transformed and composited with layer opacity. The screen uses a viewport-sized canvas at display pixel density, drawing shapes and text without enabled effects directly at the current zoom. Images and enabled pixel effects retain document-resolution rendering. An independent SVG overlay provides sharp editor handles at every zoom; export uses a separate document-resolution canvas and never includes the overlay. `exportPNG` returns a Blob. Text wraps/clips to its editable box; transforms never overwrite image source data.
 
-**Effects.** Defaults/UI field definitions live in `model/effects.js`; processors live in `rendering/effects.js`. The initial ordering is brightness → contrast → dither → colour overlay → stroke → blur → drop shadow. Each effect has an ID, type, enabled flag and parameters. Rendering follows the stored order. Brightness, contrast, dithering and alpha dilation run in a module worker; Canvas handles compositing and blur. Stroke is an outside alpha contour with square joins. Layer buffers include padding for strokes, arrowheads, blur and shadow. Add algorithms in the image-processing modules without modifying toolbar code.
+**Effects.** Defaults/UI field definitions live in `model/effects.js`; processors live in `rendering/effects.js`. The initial ordering is brightness → contrast → dither → colour overlay → stroke → blur → drop shadow. Each effect has an ID, type, enabled flag and parameters. Rendering follows the stored order. Brightness, contrast, dithering and alpha dilation run in a module worker; Canvas handles compositing and native blur where a pixel probe confirms support. Browsers without working Canvas filters use a worker-based, premultiplied-alpha Gaussian approximation (three box passes) for blur and soft drop shadows; the same processing applies to preview and PNG export. Stroke is an outside alpha contour with square joins. Layer buffers include padding for strokes, arrowheads, blur and shadow. Add algorithms in the image-processing modules without modifying toolbar code.
 
 **Interaction/history.** Shared inverse geometry implements object-bound selection. `Workspace` owns viewport and transient pointer gestures, committing one reversible transform command on pointer release; Escape restores the starting transform. The history manager stores changed properties, affected layer objects or ordering, not full-document snapshots. It tracks saved command states, clears redo on divergent edits and keeps up to 150 commands. Undo history resets when a project is opened.
 
@@ -124,6 +124,7 @@ node tests/fonts.mjs
 node tests/drawing-tools.mjs
 node tests/pen-paths.mjs
 node tests/painting-engine.mjs
+node tests/blur.mjs
 ```
 
 Start the static server first. `DITHER_URL` can target a subdirectory deployment (include the trailing slash); `DITHER_BROWSER` overrides the default `msedge` channel. Each integration run uses a fresh temporary browser profile and writes screenshots and a PNG to `.test-results/`.

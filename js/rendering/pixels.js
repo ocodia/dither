@@ -1,5 +1,7 @@
 import { floydSteinberg } from './dither.js';
+import { gaussianBlur } from './blur.js';
 export function processPixels(data, width, height, effect) {
+  if (effect.type === 'blur') return gaussianBlur(data, width, height, effect.radius);
   if (effect.type === 'dither') return floydSteinberg(data, width, height, effect.intensity);
   if (effect.type === 'brightness' || effect.type === 'contrast') {
     const amount = effect.amount, factor = (100 + amount) / Math.max(1, 100 - amount);

@@ -1,6 +1,6 @@
 const ROOT = new URL('./', import.meta.url);
 const CACHE_PREFIX = `dither-shell-${encodeURIComponent(ROOT.pathname)}-`;
-const CACHE = `${CACHE_PREFIX}v39`;
+const CACHE = `${CACHE_PREFIX}v40`;
 const FILES = [
   './', 'index.html', 'css/app.css', 'css/fonts.css', 'manifest.webmanifest',
   'icons/app-icon.svg', 'icons/app-192.png', 'icons/app-512.png', 'icons/app-maskable-512.png',
@@ -54,7 +54,7 @@ const FILES = [
   'js/components/context-menu.js',
   'js/components/document-presets.js', 'js/model/document-presets.js',
   'js/rendering/renderer.js', 'js/rendering/effects.js', 'js/rendering/dither.js',
-  'js/rendering/pixels.js', 'js/rendering/pixel-worker.js'
+  'js/rendering/pixels.js', 'js/rendering/blur.js', 'js/rendering/pixel-worker.js'
 ];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES.map(file => new URL(file, ROOT).href)))); });
 self.addEventListener('activate', event => { event.waitUntil((async () => { for (const key of await caches.keys()) if (key.startsWith(CACHE_PREFIX) && key !== CACHE) await caches.delete(key); await self.clients.claim(); })()); });
