@@ -3,9 +3,17 @@ import assert from 'node:assert/strict';
 import { createDocument, createLayer, migrateDocument, validateDocument } from '../js/model/document.js';
 import { validGradient, pathBounds, validPath, editableStops, addGradientStop, gradientOffset } from '../js/model/vector.js';
 import { floodFill } from '../js/rendering/flood-fill.js';
-import { strokeSamples, sourcePoint } from '../js/rendering/paint.js';
+import { strokeSamples, sourcePoint, paintSize } from '../js/rendering/paint.js';
 import { localToWorld } from '../js/interaction/geometry.js';
 import { AssetStore } from '../js/storage/assets.js';
+
+test('painting grows stretched axes without shrinking source detail',()=>{
+  const image={width:64,height:128};
+  const layer={transform:{width:256.25,height:32}};
+  assert.deepEqual(paintSize(layer,image),{width:257,height:128});
+  layer.transform={width:16,height:200};
+  assert.deepEqual(paintSize(layer,image),{width:64,height:200});
+});
 
 test('paint coordinates account for nonuniform scaling, rotation and flips',()=>{
   const t={x:80,y:60,width:200,height:100,rotation:37,flipX:true,flipY:true};

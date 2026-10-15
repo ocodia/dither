@@ -43,7 +43,7 @@ try {
   assert.equal(await page.locator('#layer-count').textContent(), '4');
   // The canvas chooses the layer under the pointer, even if another row was selected.
   await ready();
-  const bounds = await page.locator('#artwork').boundingBox();
+  const bounds = await page.locator('#stage').boundingBox();
   await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, { button: 'right' });
   assert.ok(await option('Duplicate layer').isVisible());
   await option('Duplicate layer').click(); assert.equal(await page.locator('#layer-count').textContent(), '5');
@@ -79,8 +79,8 @@ try {
   await page.mouse.move(area.x + 70, area.y + 60);
   await page.mouse.up({ button: 'middle' });
   for (const [label, x, y] of [['Add rectangle', 240, 220], ['Add text', 1200, 750]]) {
-    const canvas = await page.locator('#artwork').boundingBox();
-    const dimensions = await page.locator('#artwork').evaluate(el => [el.width, el.height]);
+    const canvas = await page.locator('#stage').boundingBox();
+    const dimensions = await page.locator('#stage').evaluate(el => [parseFloat(el.style.width), parseFloat(el.style.height)]);
     await page.mouse.click(canvas.x + x * canvas.width / dimensions[0], canvas.y + y * canvas.height / dimensions[1], { button: 'right' });
     await option(label).click();
     const actualX = Number(await page.locator('[data-path="transform.x"]').inputValue());

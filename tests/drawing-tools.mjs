@@ -1,3 +1,4 @@
+import { artworkPixel } from './viewport-helpers.js';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -12,7 +13,7 @@ async function point(x,y){const b=await page.locator('#stage').boundingBox();ret
 async function click(x,y){const p=await point(x,y);await page.mouse.click(p.x,p.y);await ready();}
 async function drag(x,y,xx,yy){const a=await point(x,y),b=await point(xx,yy);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:12});await page.mouse.up();}
 async function key(k){await page.locator('#workspace').focus();await page.keyboard.press(k);await ready();}
-async function pixel(x,y){return page.locator('#artwork').evaluate((c,[x,y])=>[...c.getContext('2d').getImageData(Math.floor(c.width*x),Math.floor(c.height*y),1,1).data],[x,y]);}
+async function pixel(x,y){return artworkPixel(page,x,y,true);}
 async function committed(n){await page.waitForFunction(n=>document.querySelectorAll('[data-history-state]').length===n,n);await ready();}
 try{
   await page.goto(process.env.DITHER_URL||'http://127.0.0.1:4173/');await page.locator('#new-dialog [data-close]').click();await ready();

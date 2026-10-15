@@ -1,3 +1,4 @@
+import { artworkPixel, checkSavedRendering } from './viewport-helpers.js';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -8,7 +9,7 @@ const context=await browser.newContext({viewport:{width:1280,height:900}}),page=
 page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());page.setDefaultTimeout(10000);
 const base=process.env.DITHER_URL||'http://127.0.0.1:4173/';
 const ready=()=>page.waitForFunction(()=>document.querySelector('#workspace').getAttribute('aria-busy')==='false');
-const alpha=(x,y)=>page.locator('#artwork').evaluate((c,[x,y])=>c.getContext('2d').getImageData(x,y,1,1).data[3],[x,y]);
+const alpha=async(x,y)=>(await artworkPixel(page,x,y))[3];
 async function key(key){await page.locator('#workspace').focus();await page.keyboard.press(key);await ready();}
 async function point(x,y){const b=await page.locator('#stage').boundingBox();return {x:b.x+x*b.width/400,y:b.y+y*b.height/300};}
 async function chooseTool(tool){await page.locator("#selection-tool-toggle").click();await page.locator(`#selection-tool-menu [data-tool="${tool}"]`).click();}
@@ -53,7 +54,7 @@ try{
  await save();await page.evaluate(()=>navigator.serviceWorker.ready);await context.setOffline(true);await page.reload();await page.locator('#new-dialog [data-action=open]').click();await page.locator('.project-card').first().click();await page.locator('#open-dialog').waitFor({state:'hidden'});await ready();assert.equal(await page.locator('#layer-count').textContent(),'3');assert.equal(await alpha(80,70),255);
  // Export pixels match the artwork while a selection outline is visible.
  await page.locator('.layer-row').last().locator('[data-layer-action=select]').click();await key('Control+a');
- const exact=await page.evaluate(async()=>{const {loadProject,listProjects}=await import('./js/storage/projects.js'),{DocumentRenderer}=await import('./js/rendering/renderer.js');const p=await loadProject((await listProjects())[0].id);const blob=await new DocumentRenderer().exportPNG(p.doc,p.assets),bitmap=await createImageBitmap(blob),c=document.createElement('canvas');c.width=bitmap.width;c.height=bitmap.height;c.getContext('2d').drawImage(bitmap,0,0);const a=c.getContext('2d').getImageData(0,0,400,300).data,b=document.querySelector('#artwork').getContext('2d').getImageData(0,0,400,300).data;const result=bitmap.width===400&&bitmap.height===300&&a.every((v,i)=>v===b[i]);bitmap.close();p.assets.dispose();return result;});assert.ok(exact);
+ assert.deepEqual(await checkSavedRendering(page),{equal:true,width:400,height:300});
  await mkdir('.test-results',{recursive:true});await page.screenshot({path:resolve('.test-results/pixel-selection.png')});assert.deepEqual(errors,[]);
  // Small deterministic fixtures verify alpha extraction, original immutability and masks before effects.
  const pixels=await page.evaluate(async()=>{

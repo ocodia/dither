@@ -1,3 +1,4 @@
+import { artworkPixel } from './viewport-helpers.js';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -18,7 +19,7 @@ try{
   await click(.2,.4);assert.equal(await count(),0);assert.equal(await finish().count(),0);
   await click(.4,.4);assert.equal(await count(),1);const first=await selected();assert.ok(await finish().isVisible());assert.equal(await anchors(),2);assert.equal(await page.locator('[data-tool-action=close-shape]').count(),0);
   // The layer is really rendered before Finish is clicked, rather than only an SVG draft.
-  assert.ok(await page.locator('#artwork').evaluate(c=>c.getContext('2d').getImageData(Math.floor(c.width*.3),Math.floor(c.height*.4),1,1).data[3]>0));
+  assert.ok((await artworkPixel(page,.3,.4,true))[3]>0);
   await click(.5,.6);assert.equal(await count(),1);assert.equal(await selected(),first);assert.equal(await anchors(),3);
   const historyBeforeFinish=await page.locator('[data-history-state]').count();await finish().click();await ready();
   assert.equal(await finish().count(),0);assert.equal(await page.locator('[data-history-state]').count(),historyBeforeFinish);

@@ -21,14 +21,18 @@ let edit = null, toastTimer, rendering = false, renderNeeded = false, frame = 0,
 const renderer = new DocumentRenderer(), openedEffects = new Set(['dither']), collapsedProperties = new Set();
 const selected = () => doc.layers.find(l => l.id === selectedId) || null;
 let pixelClipboard = null, pixelBusy = false;
-let rasterising = false;
+let rasterising = false, lastViewport = null;
 let layerClipboard = null, layerPasting = false;
 const contextMenu = new ContextMenu();
 const history = new History(() => refresh());
 const workspace = new Workspace({ element: $('#workspace'), stage: $('#stage'), overlay: $('#overlay'), getDocument: () => doc, getSelected: selected,
   select: id => { finishEdit(); selectedId = id; refresh(); }, preview: () => requestRender(), beforeGesture: () => finishEdit(),
   commit: (layer, before, after) => { if (JSON.stringify(before) !== JSON.stringify(after)) history.record(patchCommand(layer, { transform: before }, { transform: after }, 'Transform layer')); else refresh(); },
-  onView: view => { $('#zoom-value').textContent = `${Math.round(view.zoom * 100)}%`; }
+  onView: view => {
+    $('#zoom-value').textContent = `${Math.round(view.zoom * 100)}%`;
+    const viewport = JSON.stringify([view, $('#workspace').clientWidth, $('#workspace').clientHeight, devicePixelRatio]);
+    if (viewport !== lastViewport) { lastViewport = viewport; requestRender(); }
+  }
 });
 const pixelSelection = new PixelSelection(workspace, {
   getDocument: () => doc, getLayer: selected,
@@ -109,7 +113,7 @@ async function render() {
   const timer = setTimeout(() => { $('#processing').hidden = false; }, 160);
   try {
     // Render offscreen so an asynchronous effect never partially replaces the visible scene.
-    const buffer = document.createElement('canvas'); await renderer.renderDocument(snapshot, originalAssets, buffer);
+    const buffer = document.createElement('canvas'); await renderer.renderDocument(snapshot, originalAssets, buffer, { ...workspace.view, width: $('#workspace').clientWidth, height: $('#workspace').clientHeight, pixelRatio: devicePixelRatio });
     if (epoch === documentEpoch && !renderNeeded) { const canvas = $('#artwork'); if (canvas.width !== buffer.width) canvas.width = buffer.width; if (canvas.height !== buffer.height) canvas.height = buffer.height; const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(buffer, 0, 0); }
   } catch (error) { if (epoch === documentEpoch) toast(error.message, true); }
   finally { clearTimeout(timer); $('#processing').hidden = true; rendering = false; if (renderNeeded) requestRender(); else $('#workspace').setAttribute('aria-busy', 'false'); }
@@ -536,3 +540,6 @@ if ('serviceWorker' in navigator && window.isSecureContext) {
 }
 setupPanelResizer($('#inspector'), $('#layers-resizer'), $('#layers-panel'));
 refresh(); workspace.fit(); $('#new-dialog').showModal();
+
+// Browser zoom and moving between displays can change the backing pixel density.
+window.addEventListener('resize', () => workspace.draw());

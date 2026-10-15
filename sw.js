@@ -1,6 +1,6 @@
 const ROOT = new URL('./', import.meta.url);
 const CACHE_PREFIX = `dither-shell-${encodeURIComponent(ROOT.pathname)}-`;
-const CACHE = `${CACHE_PREFIX}v36`;
+const CACHE = `${CACHE_PREFIX}v38`;
 const FILES = [
   './', 'index.html', 'css/app.css', 'css/fonts.css', 'manifest.webmanifest',
   'icons/app-icon.svg', 'icons/app-192.png', 'icons/app-512.png', 'icons/app-maskable-512.png',

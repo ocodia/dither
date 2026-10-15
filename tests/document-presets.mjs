@@ -39,7 +39,7 @@ try {
   await page.getByRole('button', { name: 'Create document' }).click();
   await page.locator('#new-dialog').waitFor({ state: 'hidden' });
   await page.waitForFunction(() => document.querySelector('#workspace').getAttribute('aria-busy') === 'false');
-  assert.deepEqual(await page.locator('#artwork').evaluate(el => [el.width, el.height]), [1748, 2480]);
+  assert.deepEqual(await page.locator('#stage').evaluate(el => [parseFloat(el.style.width), parseFloat(el.style.height)]), [1748, 2480]);
   assert.deepEqual(errors, []);
   console.log(`PASS ${presets.length} presets: canvas limits, grouping, dimensions, print hints, swap, custom size, mobile layout and document creation`);
 } finally { await browser.close(); }

@@ -36,14 +36,14 @@ function drawText(ctx, layer) {
   ctx.restore();
 }
 function drawShape(ctx, layer) {
-  const s = layer.shape, { width: w, height: h } = layer.transform;
+  const s = layer.shape, { width: w, height: h } = layer.transform, opacity = ctx.globalAlpha;
   if (isLineLayer(layer)) {
     if (!s.strokeWidth) return;
     const length = Math.hypot(w, h), { start, end, depth, half, headHalf } = arrowMetrics(s, length);
     // One filled silhouette joins the shaft to each head's base. A rounded shaft
     // must never run through the triangle and protrude beyond its tip.
     ctx.save(); ctx.translate(0, h); ctx.rotate(Math.atan2(-h, w));
-    ctx.fillStyle = s.stroke; ctx.globalAlpha = s.strokeOpacity; ctx.beginPath();
+    ctx.fillStyle = s.stroke; ctx.globalAlpha = opacity * s.strokeOpacity; ctx.beginPath();
     if (start) { ctx.moveTo(0, 0); ctx.lineTo(depth, -headHalf); ctx.lineTo(depth, -half); }
     else ctx.moveTo(0, -half);
     ctx.lineTo(end ? length - depth : length, -half);
@@ -59,8 +59,8 @@ function drawShape(ctx, layer) {
   if (s.kind === 'rectangle') ctx.roundRect(0, 0, w, h, Math.min(s.radius, w / 2, h / 2));
   if (s.kind === 'path') tracePath(ctx, s, w, h);
   if (s.kind === 'ellipse') ctx.ellipse(w / 2, h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-  ctx.globalAlpha = s.fillOpacity; if (s.kind !== 'path' || s.closed) ctx.fill('evenodd');
-  ctx.globalAlpha = s.strokeOpacity; if (s.strokeWidth) ctx.stroke();
+  ctx.globalAlpha = opacity * s.fillOpacity; if (s.kind !== 'path' || s.closed) ctx.fill('evenodd');
+  ctx.globalAlpha = opacity * s.strokeOpacity; if (s.strokeWidth) ctx.stroke();
   ctx.globalAlpha = 1;
 }
 export class DocumentRenderer {
@@ -87,18 +87,37 @@ export class DocumentRenderer {
     this.cache.set(layer.id, { key, promise });
     try { return await promise; } catch (error) { if (this.cache.get(layer.id)?.key === key) this.cache.delete(layer.id); throw error; }
   }
-  async renderDocument(doc, assets, target) {
+  async renderDocument(doc, assets, target, viewport = null) {
     const ids = new Set(doc.layers.map(l => l.id)); for (const id of this.cache.keys()) if (!ids.has(id)) this.cache.delete(id);
     const rendered = [];
-    for (const layer of doc.layers) if (layer.visible) rendered.push({ layer, rendered: await this.renderLayer(layer, assets) });
-    if (target.width !== doc.canvas.width) target.width = doc.canvas.width;
-    if (target.height !== doc.canvas.height) target.height = doc.canvas.height;
-    const ctx = target.getContext('2d'); ctx.clearRect(0, 0, target.width, target.height);
-    if (doc.canvas.background) { ctx.fillStyle = doc.canvas.background; ctx.fillRect(0, 0, target.width, target.height); }
-    for (const { layer, rendered: { canvas, padding } } of rendered) {
-      const t = layer.transform; ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(rad(t.rotation)); ctx.scale(t.flipX ? -1 : 1, t.flipY ? -1 : 1); ctx.globalAlpha = layer.opacity;
-      ctx.drawImage(canvas, -t.width / 2 - padding, -t.height / 2 - padding); ctx.restore();
+    for (const layer of doc.layers) if (layer.visible) {
+      // Pixel effects retain their document-resolution processing. Unprocessed
+      // vectors go straight to the screen so zoom never enlarges a cached bitmap.
+      const direct = viewport && ['shape', 'text'].includes(layer.type) && !layer.effects.some(e => e.enabled);
+      if (direct && layer.type === 'text') await document.fonts.load(textFont(layer.text), layer.text.content || ' ');
+      rendered.push({ layer, rendered: direct ? null : await this.renderLayer(layer, assets) });
     }
+    const ratio = viewport?.pixelRatio || 1;
+    const width = viewport ? Math.max(1, Math.round(viewport.width * ratio)) : doc.canvas.width;
+    const height = viewport ? Math.max(1, Math.round(viewport.height * ratio)) : doc.canvas.height;
+    if (target.width !== width) target.width = width;
+    if (target.height !== height) target.height = height;
+    const ctx = target.getContext('2d'); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, target.width, target.height);
+    ctx.save();
+    if (viewport) ctx.setTransform(ratio * viewport.zoom, 0, 0, ratio * viewport.zoom, ratio * viewport.x, ratio * viewport.y);
+    ctx.beginPath(); ctx.rect(0, 0, doc.canvas.width, doc.canvas.height); ctx.clip();
+    if (doc.canvas.background) { ctx.fillStyle = doc.canvas.background; ctx.fillRect(0, 0, doc.canvas.width, doc.canvas.height); }
+    for (const { layer, rendered: pixels } of rendered) {
+      const t = layer.transform; ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(rad(t.rotation)); ctx.scale(t.flipX ? -1 : 1, t.flipY ? -1 : 1); ctx.globalAlpha = layer.opacity;
+      if (pixels) ctx.drawImage(pixels.canvas, -t.width / 2 - pixels.padding, -t.height / 2 - pixels.padding);
+      else {
+        ctx.translate(-t.width / 2, -t.height / 2);
+        if (layer.type === 'shape') drawShape(ctx, layer);
+        else drawText(ctx, layer);
+      }
+      ctx.restore();
+    }
+    ctx.restore();
   }
   async rasteriseLayer(layer, assets) {
     if (!['shape', 'text'].includes(layer.type)) throw new Error('Select a text, shape, line or arrow layer to rasterise.');

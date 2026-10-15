@@ -3,7 +3,7 @@ import { clone, createLayer, checkSize } from '../model/document.js';
 import { isSelectionTool } from '../model/pixel-region.js';
 import { canGradient, isPath, pathBounds, tracePath, validGradient, editableStops, addGradientStop, gradientOffset } from '../model/vector.js';
 import { localToWorld } from './geometry.js';
-import { sourcePoint, paintSurface, selectionMask, stamp, strokeSamples, composeStroke, pngBlob } from '../rendering/paint.js';
+import { sourcePoint, paintSize, paintSurface, selectionMask, stamp, brushScale, strokeSamples, composeStroke, pngBlob } from '../rendering/paint.js';
 import { surface } from '../rendering/effects.js';
 import { floodFill } from '../rendering/flood-fill.js';
 
@@ -66,7 +66,8 @@ export class ToolController {
     if(!this.eligible())return false;
     const image=this.getAssets().images.get(this.getLayer().assetId);
     if(!image)return false;
-    try{checkSize(image.width,image.height);return true;}catch{return false;}
+    const size=tool==='fill'?image:paintSize(this.getLayer(),image);
+    try{checkSize(size.width,size.height);return true;}catch{return false;}
   }
   local(p,layer){return sourcePoint(p,layer.transform,1,1);}
   world(p,layer){const t=layer.transform;return localToWorld({x:(p.x-.5)*t.width,y:(p.y-.5)*t.height},t);}
@@ -267,17 +268,17 @@ export class ToolController {
     if(paintTools.includes(tool)){
       if(!this.eligible()){this.notify('Select an unlocked image or create a paint layer.');return;}
       try{
-        const base=paintSurface(l,this.getAssets().images.get(l.assetId)),point=sourcePoint(p,l.transform,base.width,base.height);
+        const base=paintSurface(l,this.getAssets().images.get(l.assetId),tool!=='fill'),point=sourcePoint(p,l.transform,base.width,base.height);
         if(point.x<0||point.y<0||point.x>=base.width||point.y>=base.height)return;
         const mask=selectionMask(this.selection.current()?.points,base.width,base.height);
-        this.gesture={type:tool,layer:l,snapshot:clone(l),document:this.getDocument(),assets:this.getAssets(),base,mask,last:point,settings:{...this.settings,opacity:tool==='brush'?1:this.settings.opacity}};
+        this.gesture={type:tool,layer:l,snapshot:clone(l),document:this.getDocument(),assets:this.getAssets(),base,mask,last:point,scale:brushScale(l.transform,base.width,base.height),settings:{...this.settings,opacity:tool==='brush'?1:this.settings.opacity}};
         if(tool==='fill'){this.fill(point);return;}
-        this.gesture.stroke=surface(base.width,base.height);stamp(this.gesture.stroke.getContext('2d'),point,this.settings.size,this.settings.hardness,this.settings.foreground);this.capture(e);this.paintPreview();
+        this.gesture.stroke=surface(base.width,base.height);stamp(this.gesture.stroke.getContext('2d'),point,this.settings.size,this.settings.hardness,this.settings.foreground,this.gesture.scale);this.capture(e);this.paintPreview();
       }catch(error){this.gesture=null;this.notify(error.message,true);}return;
     }
     if(tool==='pen'){
       const handle=e.target.closest('[data-anchor-handle]');
-      if(!this.path&&handle&&isPath(l)&&!l.locked&&l.visible){this.anchorIndex=Number(handle.dataset.anchorIndex);this.gesture={type:'anchor',layer:l,before:clone(l.shape),transform:clone(l.transform),part:handle.dataset.anchorHandle,index:this.anchorIndex};this.capture(e);this.renderControls();this.workspace.draw();return;}
+      if(!this.path&&handle&&isPath(l)&&!l.locked&&l.visible){this.anchorIndex=Number(handle.dataset.anchorIndex);this.gesture={type:'anchor',layer:l,before:clone(l.shape),transform:clone(l.transform),part:handle.dataset.anchorHandle,index:this.anchorIndex,start:p};this.capture(e);this.renderControls();this.workspace.draw();return;}
       if(this.path&&this.path.length>=2&&Math.hypot(p.x-this.path[0].x,p.y-this.path[0].y)*this.workspace.view.zoom<8){this.finishPath(true);return;}
       const beforePath=clone(this.path);
       if(!this.path){if(isPath(l))this.penStyle=pathStyle(l.shape);this.path=[];}
@@ -302,10 +303,13 @@ export class ToolController {
     if(g.pointerId!==undefined&&g.pointerId!==e.pointerId)return;
     if(['brush','eraser'].includes(g.type)){
       const point=sourcePoint(p,g.layer.transform,g.base.width,g.base.height),ctx=g.stroke.getContext('2d');
-      for(const sample of strokeSamples(g.last,point,g.settings.size))stamp(ctx,sample,g.settings.size,g.settings.hardness,g.settings.foreground);g.last=point;this.paintPreview();return;
+      for(const sample of strokeSamples({x:g.last.x/g.scale.x,y:g.last.y/g.scale.y},{x:point.x/g.scale.x,y:point.y/g.scale.y},g.settings.size))stamp(ctx,{x:sample.x*g.scale.x,y:sample.y*g.scale.y},g.settings.size,g.settings.hardness,g.settings.foreground,g.scale);g.last=point;this.paintPreview();return;
     }
     if(g.type==='pen-point'){const a=this.path[g.index];a.out={...p};a.in={x:2*a.x-p.x,y:2*a.y-p.y};}
     if(g.type==='anchor'){
+      // Selecting an anchor must not move it to a rounded screen coordinate.
+      if(!g.moved&&Math.hypot(p.x-g.start.x,p.y-g.start.y)*this.workspace.view.zoom<1)return;
+      g.moved=true;
       const a=g.layer.shape.anchors[g.index],point=this.local(p,g.layer);
       if(g.part==='point'){const dx=point.x-a.x,dy=point.y-a.y;for(const h of [a.in,a.out]){h.x+=dx;h.y+=dy;}a.x=point.x;a.y=point.y;}
       else{a[g.part]=point;if(!e.altKey)a[g.part==='in'?'out':'in']={x:2*a.x-point.x,y:2*a.y-point.y};}this.preview();
@@ -322,7 +326,7 @@ export class ToolController {
     if(['brush','eraser'].includes(g.type)){this.gesture=null;this.release(g);this.commitPaint(g,g.output);return;}
     this.gesture=null;this.release(g);
     if(g.type==='pen-point'&&this.path.length>=2&&!this.commitDraftPath())this.path=g.beforePath;
-    if(g.type==='anchor'){const shape=clone(g.layer.shape);g.layer.shape=g.before;this.commitPathEdit(g.layer,shape);}
+    if(g.type==='anchor'&&g.moved){const shape=clone(g.layer.shape);g.layer.shape=g.before;this.commitPathEdit(g.layer,shape);}
     if(g.type==='gradient'){
       const shape=clone(g.layer.shape);g.layer.shape=g.before;
       if(validGradient(shape.gradient)&&Math.hypot((shape.gradient.end.x-shape.gradient.start.x)*g.layer.transform.width,(shape.gradient.end.y-shape.gradient.start.y)*g.layer.transform.height)>=1){
@@ -432,8 +436,8 @@ export class ToolController {
     let html=this.selection.current()?this.selection.overlay(l,z):'';
     const circle=(p,attrs='',selected=false)=>`<circle cx="${p.x}" cy="${p.y}" r="${selected?6.5/z:r}" fill="${selected?'#447af0':'white'}" stroke="${selected?'white':'#6799f5'}" stroke-width="${(selected?2:1)/z}" ${attrs}/>`;
     if(['brush','eraser'].includes(this.workspace.tool)&&this.cursor&&this.eligible()){
-      const image=this.getAssets().images.get(l.assetId),t=l.transform,p=this.cursor;
-      html+=`<ellipse cx="${p.x}" cy="${p.y}" rx="${this.settings.size*t.width/image.width/2}" ry="${this.settings.size*t.height/image.height/2}" transform="rotate(${t.rotation} ${p.x} ${p.y})" fill="none" stroke="white" stroke-width="${1/z}" style="filter:drop-shadow(0 0 1px black)" pointer-events="none"/>`;
+      const p=this.cursor;
+      html+=`<circle cx="${p.x}" cy="${p.y}" r="${this.settings.size/2}" fill="none" stroke="white" stroke-width="${1/z}" style="filter:drop-shadow(0 0 1px black)" pointer-events="none"/>`;
     }
     if(this.workspace.tool==='pen'){
       const points=this.path||(isPath(l)&&l.visible&&!l.locked?l.shape.anchors.map(a=>({...this.world(a,l),in:this.world(a.in,l),out:this.world(a.out,l)})):[]);

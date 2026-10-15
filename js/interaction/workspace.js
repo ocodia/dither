@@ -63,7 +63,9 @@ export class Workspace {
   draw() {
     const c = this.getDocument().canvas, { x, y, zoom } = this.view;
     this.stage.style.width = `${c.width}px`; this.stage.style.height = `${c.height}px`; this.stage.style.transform = `translate(${x}px,${y}px) scale(${zoom})`;
-    this.overlay.setAttribute('viewBox', `0 0 ${c.width} ${c.height}`);
+    // SVG maps world coordinates directly into the viewport, without CSS scaling.
+    const width = this.element.clientWidth, height = this.element.clientHeight;
+    this.overlay.setAttribute('viewBox', `${-x / zoom} ${-y / zoom} ${width / zoom} ${height / zoom}`);
     const layer = this.getSelected();
     const toolOverlay = this.tools?.overlay();
     if (toolOverlay != null) this.overlay.innerHTML = toolOverlay;

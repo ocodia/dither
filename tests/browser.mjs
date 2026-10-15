@@ -1,3 +1,4 @@
+import { checkSavedRendering } from './viewport-helpers.js';
 // Optional integration checks. Point DITHER_PLAYWRIGHT_PATH at an external Playwright installation.
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp } from 'node:fs/promises';
@@ -109,13 +110,9 @@ try {
   check('Transactional save and reload/reopen preserve all layers, effects, text and binary asset references');
 
   const [download] = await Promise.all([page.waitForEvent('download'),action('export')]); await download.saveAs(resolve(output,'composition.png'));
-  const previewMatches = await page.evaluate(async () => {
-    const {loadProject,listProjects}=await import('./js/storage/projects.js');const {DocumentRenderer}=await import('./js/rendering/renderer.js');const projects=await listProjects();const {doc,assets}=await loadProject(projects[0].id);
-    const renderer=new DocumentRenderer(),blob=await renderer.exportPNG(doc,assets),image=await createImageBitmap(blob),canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);
-    const expected=ctx.getImageData(0,0,canvas.width,canvas.height).data,actual=document.querySelector('#artwork').getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
-    assets.dispose();return {equal:expected.every((v,i)=>v===actual[i]),width:image.width,height:image.height};
-  });assert.deepEqual(previewMatches,{equal:true,width:800,height:600});
-  check('Editor artwork exactly matches full-resolution PNG pixels with selection overlay excluded');
+  const previewMatches = await checkSavedRendering(page);
+  assert.deepEqual(previewMatches,{equal:true,width:800,height:600});
+  check('Viewport matches screen rendering and document-resolution PNG matches export, with controls excluded');
   const renderChecks = await page.evaluate(async () => {
     const {DocumentRenderer}=await import('./js/rendering/renderer.js'); const {createDocument,createLayer}=await import('./js/model/document.js'); const {createEffect}=await import('./js/model/effects.js'); const {AssetStore}=await import('./js/storage/assets.js');
     const doc=createDocument({width:100,height:100});const layer=createLayer('shape',doc.canvas);layer.transform={...layer.transform,width:20,height:20,x:50,y:50};layer.shape.radius=0;layer.shape.fill='#ff0000';doc.layers=[layer];const renderer=new DocumentRenderer(),assets=new AssetStore(),canvas=document.createElement('canvas');
