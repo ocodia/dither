@@ -163,7 +163,7 @@
       <button data-action="new">
         <svg class="icon" aria-hidden="true" focusable="false"><use href="./icons/ui.svg#document-add"></use></svg>New
       </button>
-      <button data-action="open" title="Open saved project (Ctrl/⌘ O)">
+      <button data-action="open" title="Open image or saved project (Ctrl/⌘ O)">
         <svg class="icon" aria-hidden="true" focusable="false"><use href="./icons/ui.svg#folder-open"></use></svg>Open
       </button>
       <button data-action="save" title="Save locally (Ctrl/⌘ S)">
@@ -180,6 +180,7 @@
       </button>
     </div>
     <input id="image-input" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden />
+    <input id="open-image-input" type="file" accept="image/png,image/jpeg,image/webp" hidden />
     <dialog id="new-dialog" aria-labelledby="new-title">
       <form id="new-form">
         <h1 id="new-title">New document</h1>
@@ -203,7 +204,7 @@
         </div>
         <p id="new-error" class="error" role="alert"></p>
         <div class="dialog-actions">
-          <button type="button" data-action="open">Open saved</button><button type="button" data-close>Cancel</button
+          <button type="button" data-action="open">Open…</button><button type="button" data-close>Cancel</button
           ><button type="submit" class="primary">
             Create document <svg class="icon" aria-hidden="true" focusable="false"><use href="./icons/ui.svg#arrow-right"></use></svg>
           </button>
@@ -212,6 +213,9 @@
     </dialog>
     <dialog id="open-dialog" aria-labelledby="open-title">
       <h1 id="open-title">Open document</h1>
+      <button class="primary" data-action="open-image">Open image from disk…</button>
+      <p class="open-image-note">PNG, JPEG or WebP. The canvas will match the image’s dimensions.</p>
+      <h2>Saved projects</h2>
       <div id="project-list"></div>
       <div class="dialog-actions"><button data-close>Close</button></div>
     </dialog>

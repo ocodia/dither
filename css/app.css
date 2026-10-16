@@ -856,6 +856,8 @@ dialog .field-grid label {
 #open-dialog h1 {
   margin: 16px 0 18px;
 }
+#open-dialog .open-image-note { margin: 10px 0 24px; }
+#open-dialog h2 { font-size: 14px; font-weight: 550; margin: 0 0 12px; }
 #open-dialog .dialog-actions {
   border-top: 0;
   margin-top: 16px;

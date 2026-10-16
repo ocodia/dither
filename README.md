@@ -40,6 +40,8 @@ To deploy on GitHub Pages, publish the directory as static files. All app, icon,
 - Explicit browser-local project saves and reopening with original image Blobs stored separately; full-resolution transparent PNG export.
 - Installable PWA, offline app shell and local fonts, update notification, dark desktop layout, collapsible inspector on small screens, named controls and visible keyboard focus.
 
+Use **Open → Open image from disk…** to start a document from a PNG, JPEG or WebP at its exact pixel dimensions, within the canvas limits. Import adds images to the current document without changing its canvas size.
+
 Use the **?** button for keyboard shortcuts. Changes to text fields commit when focus leaves the field. The layer panel displays the topmost layer first. Shape stroke is independent of the optional layer stroke effect.
 
 The document menu at the top of the left toolbar contains New, Open, Save and Export, plus installation/update controls when available. Canvas properties include the project name; use the Canvas properties toolbar button to deselect the current layer and open them. The History inspector tab contains undo/redo and clickable editing states. You can return to later states until a new edit replaces the redo branch. History is session-only and resets when a document is opened.

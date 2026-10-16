@@ -24,6 +24,7 @@ const selected = () => doc.layers.find(l => l.id === selectedId) || null;
 let pixelClipboard = null, pixelBusy = false;
 let rasterising = false, lastViewport = null;
 let layerClipboard = null, layerPasting = false;
+let imageOpenRequest = 0;
 const contextMenu = new ContextMenu();
 const history = new History(() => refresh());
 const workspace = new Workspace({ element: $('#workspace'), stage: $('#stage'), overlay: $('#overlay'), getDocument: () => doc, getSelected: selected,
@@ -203,6 +204,30 @@ async function importFiles(files) {
   }
   setTab('properties');
 }
+async function openImage(file) {
+  const epoch = documentEpoch, request = ++imageOpenRequest, nextAssets = new AssetStore();
+  let adopted = false;
+  try {
+    const meta = await nextAssets.add(file);
+    if (epoch !== documentEpoch || request !== imageOpenRequest) return;
+    const name = file.name?.replace(/\.[^.]+$/, '') || 'Image';
+    const next = createDocument({ name, width: meta.width, height: meta.height });
+    next.assets.push(meta);
+    const layer = createLayer('image', next.canvas, { assetId: meta.id, name });
+    Object.assign(layer.transform, { width: meta.width, height: meta.height });
+    next.layers.push(layer);
+    if (!canDiscard()) return;
+    replaceDocument(next, nextAssets); adopted = true;
+    selectedId = layer.id;
+    setTool('move'); setTab('properties');
+    history.record(insertCommand(doc, layer));
+    $('#new-dialog').close(); $('#open-dialog').close();
+    workspace.fit();
+    toast(`Image opened at ${meta.width} × ${meta.height} pixels.`);
+  } catch (error) {
+    if (epoch === documentEpoch && request === imageOpenRequest) toast(error.message, true);
+  } finally { if (!adopted) nextAssets.dispose(); }
+}
 async function rasterise() {
   finishEdit(); workspace.finish();
   const source = selected();
@@ -297,10 +322,11 @@ async function save() {
 }
 async function openPicker() {
   finishEdit();
+  $('#new-dialog').close(); $('#open-dialog').showModal();
+  $('#project-list').textContent = 'Loading saved projects…';
   try {
     const projects = await listProjects(); $('#project-list').innerHTML = projects.length ? projects.map(p => `<button class="project-card" data-project="${p.id}"><span><strong>${escapeHTML(p.name)}</strong><small>${p.canvas.width} × ${p.canvas.height} · ${p.layers.length} layers · ${new Date(p.modified).toLocaleDateString()}</small></span>${icon('arrow-up-right')}</button>`).join('') : '<p>No saved projects yet. Create a document, then choose Save.</p>';
-    $('#new-dialog').close(); $('#open-dialog').showModal();
-  } catch (error) { toast(error.message, true); }
+  } catch (error) { $('#project-list').textContent = 'Saved projects could not be loaded.'; toast(error.message, true); }
 }
 async function exportPNG() {
   toolController.cancel(); finishEdit(); workspace.finish(); if (exporting) return;
@@ -315,6 +341,7 @@ const actions = {
   new: () => { finishEdit(); $('#new-error').textContent = ''; $('#new-dialog').showModal(); }, open: openPicker, save, export: exportPNG,
   'new-layer': () => toolController.newPaint(),
   import: () => $('#image-input').click(), undo: () => { workspace.finish(true); history.undo(); }, redo: () => history.redo(),
+  'open-image': () => $('#open-image-input').click(),
   text: (atPointer = false) => addLayer('text', atPointer), rectangle: (atPointer = false) => addLayer('rectangle', atPointer), ellipse: (atPointer = false) => addLayer('ellipse', atPointer), line: (atPointer = false) => addLayer('line', atPointer), arrow: (atPointer = false) => addLayer('arrow', atPointer),
   duplicate: () => { const source = selected(); if (!source || source.locked) return; const layer = clone(source); layer.id = uid(); layer.name += ' copy'; layer.transform.x += 20; layer.transform.y += 20; layer.effects.forEach(e => { e.id = uid(); }); selectedId = layer.id; history.execute(insertCommand(doc, layer, doc.layers.indexOf(source) + 1)); },
   delete: () => { const layer = selected(); if (layer && !layer.locked) history.execute(deleteCommand(doc, layer)); },
@@ -501,6 +528,7 @@ $('#layers').addEventListener('dragover', e => { if (draggedLayer) { e.preventDe
 $('#layers').addEventListener('drop', e => { e.preventDefault(); const row = e.target.closest('[data-layer]'), layer = doc.layers.find(l => l.id === draggedLayer); if (row && layer && !layer.locked) { finishEdit(); history.execute(orderCommand(doc, layer, doc.layers.findIndex(l => l.id === row.dataset.layer))); } draggedLayer = null; });
 $('#layers').addEventListener('dragend', () => { draggedLayer = null; });
 $('#image-input').addEventListener('change', e => { importFiles([...e.target.files]); e.target.value = ''; });
+$('#open-image-input').addEventListener('change', e => { const file = e.target.files[0]; e.target.value = ''; if (file) openImage(file); });
 const area = $('#workspace');
 area.addEventListener('dragover', e => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); area.classList.add('drop-active'); } });
 area.addEventListener('dragleave', e => { if (!area.contains(e.relatedTarget)) area.classList.remove('drop-active'); });
